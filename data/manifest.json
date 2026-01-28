@@ -1,0 +1,8 @@
+{
+  "processed": "100560859776055d6185480a485d64da7d56220fffb11725ce26bd32461b0cdd",
+  "raw": {
+    "player_logs_2023_24.csv": "16ebd3166d29f92098f7be6918b16e008335c6313f657e689ff44d39e819125f",
+    "team_logs_2023_24.csv": "6b05d5a1225c3736b432fff0c46fb7ed68ec734f44ae482c384b25ee27649f84"
+  },
+  "db_path": "data\\processed\\nba.duckdb"
+}
