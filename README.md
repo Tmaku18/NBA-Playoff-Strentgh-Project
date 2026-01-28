@@ -62,3 +62,9 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 
 ## Full Plan
 See `.cursor/plans/Plan.md`.
+
+---
+
+## Implementation Roadmap
+The full phased development plan and file-by-file checklist are in
+`.cursor/plans/Plan.md` under **Development and Implementation Plan**.
