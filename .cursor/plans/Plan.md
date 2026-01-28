@@ -28,8 +28,10 @@ Training data is restricted to **2015-2016 through 2025-2026**.
 ### 2.2 Data Acquisition
 A unified SQL database will be constructed from:
 1. **nba_api (official):** play-by-play, player IDs, tracking data (speed, distance, touch time).
-2. **Kaggle (Wyatt Walsh):** historical validation and SOS/SRS (preferred over live scraping).
-3. **Basketball-Reference (scraped):** fallback only due to aggressive anti-bot protection.
+2. **Kaggle (Wyatt Walsh):** **primary** source for SOS/SRS and historical validation (preferred over live scraping).
+3. **Basketball-Reference (scraped):** **fallback only** for SOS/SRS when Kaggle is unavailable; use sparingly due to anti-bot protection.
+
+**Proxy SOS:** If neither Kaggle nor Basketball-Reference is available, compute an internal **Proxy SOS** from the unified DB (e.g., opponent win-rate or opponent SRS derived from stored results). Document the formula and mark outputs when Proxy SOS is used.
 
 ### 2.3 Storage and Performance
 - **Preferred:** **DuckDB** for large joins (tracking + play-by-play over 10 years).
@@ -43,9 +45,9 @@ A unified SQL database will be constructed from:
 A permutation-invariant Deep Set processes a team as a **set of player vectors**.
 
 **Input:** `(batch, 15_players, stats + embeddings)`
-- Rolling windows **Last 10 / Last 30** games for form.
-- **Player Embeddings:** `R^32` for latent traits.
-- **Roster selection:** top-N by minutes **as of date only** (never full-season).
+- Rolling windows **Last 10 / Last 30** games for form. Enforce strict **`t-1`** (pre-game only): in `rolling.py`, apply **`.shift(1)`** before any rolling aggregation so features use only information available before the prediction target.
+- **Player Embeddings:** `R^32` for latent traits. For **new/unseen players**, use a **hash-trick** index: `hash(player_id) % num_embeddings` to avoid out-of-vocabulary errors.
+- **Roster selection:** top-N by minutes **as-of date only** (never full-season). **Embedding order and inclusion** also use the **as-of date** only.
 - **DNP handling:** stats = per-game average over games played; availability = fraction of games played.
 
 **Minutes-weighted attention ("The Coach"):**
@@ -62,9 +64,10 @@ A permutation-invariant Deep Set processes a team as a **set of player vectors**
 
 ### 3.3 Meta-Learner (True Stacking)
 Weighted averaging is **not** stacking. We use **OOF stacking**:
-1. Train Deep Set on folds 1-4, predict fold 5 (repeat).
-2. Train XGB/RF on folds 1-4, predict fold 5.
-3. **Level-2:** Logistic Regression on OOF predictions.
+1. Train Deep Set on folds 1–4, predict fold 5 (repeat over K folds).
+2. Train XGB/RF on folds 1–4, predict fold 5 (repeat over K folds).
+3. **Level-2:** **RidgeCV** on OOF predictions (not Logistic Regression).
+4. **OOF scope:** Collect OOF predictions **across all training seasons**; train the meta-learner on **pooled OOF data**, not a single season.
 
 Persist OOF predictions (`outputs/oof_*.parquet`) for diagnostics.
 
@@ -74,6 +77,7 @@ Season-level lists are too small (~40 lists). Instead:
 - Features and rosters strictly **as of t-1**.
 - Rank target = **standings-to-date** (or win-rate-to-date), not season-end totals.
 - **Evaluation** remains **season-end only**.
+- **ListMLE numerical stability:** Use **log-sum-exp** (e.g. `torch.logsumexp`) in the ListMLE loss to avoid overflow/underflow; do **not** use raw exp then log.
 
 ---
 
@@ -89,8 +93,9 @@ Primary evaluation focuses on ranking + predictive quality:
 **Baselines:**
 - Rank-by-SRS
 - Rank-by-Net-Rating
+- **Dummy:** e.g. previous-season rank or rank-by-net-rating (simple non-learned baseline).
 
-No MAE on Net Rating; no efficiency alignment metric in evaluation.
+No MAE on Net Rating; no efficiency alignment metric in evaluation. Net Rating is **not** a model target or evaluation metric; it may be used only in baselines (e.g. rank-by-Net-Rating, Dummy).
 
 ---
 
@@ -147,11 +152,12 @@ No MAE on Net Rating; no efficiency alignment metric in evaluation.
 2. **Fraud/Sleeper Index:** Diverging bar chart of rank deltas.
 3. **SHAP Summary:** Model B feature importance.
 4. **Roster Attention Distribution:** attention weights per team.
-5. **Sleeper Timeline:** team true_strength_score vs actual rank over time.
+5. **Sleeper Timeline:** true_strength_score vs actual rank over time (e.g. by week); highlights teams whose model score diverges from standings over the season.
 
 ---
 
 ## 8. Reproducibility and Diagnostics
-- Set seeds for **torch**, **numpy**, and **sklearn**.
-- Persist OOF predictions for stacking analysis.
-- Data versioning: store hashes of raw + processed datasets.
+- **Seeds:** Set seeds for **torch**, **numpy**, and **sklearn**.
+- **OOF:** Persist OOF predictions (`outputs/oof_*.parquet`) for stacking analysis.
+- **Data versioning:** Store hashes of raw + processed datasets.
+- **Season boundaries:** In `defaults.yaml` (or equivalent config), **hard-code** season date ranges, e.g. `{season: {start: "YYYY-10-01", end: "YYYY-04-15"}}`, to avoid inferring "end of regular season" from logs (which can blur play-in vs. regular season).
