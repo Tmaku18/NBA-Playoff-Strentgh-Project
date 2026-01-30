@@ -136,6 +136,9 @@ def predict_teams(
         else:
             classification = "Unknown"
 
+        # deep_set_rank: global rank (1-30) by Model A score. Note: Model A was trained with ListMLE
+        # on standings-ordered lists; actual_rank is that same list position. So deep_set_rank often
+        # matches actual_rank within conference—that is by design (same target), not independent accuracy.
         r_a = np.argsort(np.argsort(-sa))[i] + 1 if len(sa) == n else None
         r_x = np.argsort(np.argsort(-sx))[i] + 1 if len(sx) == n else None
         r_r = np.argsort(np.argsort(-sr))[i] + 1 if len(sr) == n else None
@@ -183,11 +186,12 @@ def run_inference_from_db(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    from src.data.db import get_connection
     from src.data.db_loader import load_training_data
     from src.features.team_context import TEAM_CONTEXT_FEATURE_COLS, build_team_context_as_of_dates
     from src.training.build_lists import TEAM_CONFERENCE, build_lists
     from src.training.data_model_a import build_batches_from_lists
-    from src.training.train_model_a import predict_batches
+    from src.training.train_model_a import predict_batches_with_attention
 
     out = Path(output_dir)
     if run_id:
@@ -206,6 +210,18 @@ def run_inference_from_db(
     games, tgl, teams, pgl = load_training_data(db_path)
     if games.empty or tgl.empty:
         raise ValueError("DB has no games/tgl. Run 2_build_db with raw data first.")
+    # Load player_id -> player_name for attention primary_contributors
+    player_id_to_name: dict[int, str] = {}
+    try:
+        con = get_connection(Path(db_path), read_only=True)
+        players_df = con.execute("SELECT player_id, player_name FROM players").df()
+        con.close()
+        if not players_df.empty:
+            player_id_to_name = dict(
+                zip(players_df["player_id"].astype(int), players_df["player_name"].astype(str))
+            )
+    except Exception:
+        pass
     lists = build_lists(tgl, games, teams)
     if not lists:
         raise ValueError("No lists from build_lists.")
@@ -234,13 +250,33 @@ def run_inference_from_db(
 
     device = torch.device("cpu")  # Match load_models map_location="cpu"
     tid_to_score_a: dict[int, float] = {}
+    attention_by_team: dict[int, list[tuple[str, float]]] = {}  # team_id -> [(player_name, weight), ...]
     if model_a is not None:
-        batches_a, _ = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
+        batches_a, list_metas = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
         if batches_a:
-            scores_list = predict_batches(model_a, batches_a, device)
-            for lst, score_tensor in zip(target_lists, scores_list):
-                for k, tid in enumerate(lst["team_ids"]):
-                    tid_to_score_a[int(tid)] = float(score_tensor[0, k].item())
+            scores_list, attn_list = predict_batches_with_attention(model_a, batches_a, device)
+            for i, meta in enumerate(list_metas):
+                if i >= len(attn_list):
+                    break
+                attn_tensor = attn_list[i]
+                for k, tid in enumerate(meta["team_ids"]):
+                    tid = int(tid)
+                    tid_to_score_a[tid] = float(scores_list[i][0, k].item())
+                    player_ids = meta.get("player_ids_per_team", [[]])[k] if k < len(meta.get("player_ids_per_team", [])) else []
+                    attn_weights = attn_tensor[0, k].numpy() if attn_tensor.dim() >= 2 else attn_tensor[k].numpy()
+                    order = np.argsort(-attn_weights)
+                    contrib: list[tuple[str, float]] = []
+                    for idx in order[:10]:
+                        if idx >= len(player_ids) or player_ids[idx] is None:
+                            continue
+                        w = float(attn_weights[idx])
+                        if w <= 0:
+                            continue
+                        pid = player_ids[idx]
+                        name = player_id_to_name.get(int(pid), f"Player_{pid}")
+                        contrib.append((name, w))
+                    if contrib:
+                        attention_by_team[tid] = contrib
     sa = np.array([tid_to_score_a.get(tid, 0.0) for tid in unique_team_ids], dtype=np.float32)
 
     sx = np.zeros(len(unique_team_ids), dtype=np.float32)
@@ -310,6 +346,7 @@ def run_inference_from_db(
         rf_scores=sr,
         meta_model=meta,
         actual_ranks=actual_ranks,
+        attention_by_team=attention_by_team if attention_by_team else None,
         team_id_to_conference=team_id_to_conf,
         playoff_rank=playoff_rank_map if playoff_rank_map else None,
         true_strength_scale=config.get("output", {}).get("true_strength_scale", "percentile"),

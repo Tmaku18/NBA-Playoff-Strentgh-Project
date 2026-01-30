@@ -88,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_pgl_team ON player_game_logs(team_id);
 CREATE INDEX IF NOT EXISTS idx_tgl_game ON team_game_logs(game_id);
 CREATE INDEX IF NOT EXISTS idx_tgl_team ON team_game_logs(team_id);
 
--- Playoff tables (separate from regular season; Play-In excluded when computing wins)
+-- Playoff tables (separate from regular season, Play-In excluded when computing wins)
 CREATE TABLE IF NOT EXISTS playoff_games (
   game_id VARCHAR(32) PRIMARY KEY,
   game_date DATE,

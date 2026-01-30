@@ -45,8 +45,15 @@ def build_batches_from_lists(
         stats_list = []
         min_list = []
         mask_list = []
+        player_ids_per_team: list[list[int | None]] = []
         for tid in team_ids:
             roster = get_roster_as_of_date(pgl, int(tid), as_of_date, n=roster_size)
+            order = roster.sort_values("rank")["player_id"].tolist() if not roster.empty else []
+            pad = roster_size - len(order)
+            if pad < 0:
+                order = order[:roster_size]
+                pad = 0
+            player_ids_per_team.append([int(pid) for pid in order] + [None] * pad)
             emb, rows, minutes, mask = build_roster_set(
                 roster,
                 player_stats_df,
@@ -71,7 +78,12 @@ def build_batches_from_lists(
             "key_padding_mask": key_padding_mask,
             "rel": rel,
         })
-        list_metas.append({"team_ids": list(team_ids), "as_of_date": as_of_date, "win_rates": list(win_rates)})
+        list_metas.append({
+            "team_ids": list(team_ids),
+            "as_of_date": as_of_date,
+            "win_rates": list(win_rates),
+            "player_ids_per_team": player_ids_per_team,
+        })
     return batches, list_metas
 
 

@@ -51,6 +51,10 @@ training:
   rolling_windows: [10, 30]
   roster_size: 15
   target_rank: "standings"  # or "playoffs" to train meta on playoff performance rank
+  # Model A (script 3): subsample lists for feasible runtime
+  max_lists_oof: 30        # max lists for OOF; subsampled when there are more
+  max_final_batches: 50    # max lists for final Model A training (script 3)
+  # build_lists (src/training/build_lists.py) subsamples dates to 200 when there are more
 
 output:
   true_strength_scale: "percentile"  # or softmax, platt

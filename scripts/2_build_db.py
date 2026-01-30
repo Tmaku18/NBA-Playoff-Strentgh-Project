@@ -23,11 +23,14 @@ def main():
     seasons = list(cfg.get("seasons", {}).keys())
     skip_if_exists = cfg.get("build_db", {}).get("skip_if_exists", False)
 
-    if skip_if_exists and db_path.exists():
-        print(f"Skipping build (DB exists and build_db.skip_if_exists=true): {db_path}")
-    else:
-        from src.data.db_loader import load_playoff_into_db, load_raw_into_db
+    from src.data.db_loader import load_playoff_into_db, load_raw_into_db
 
+    if skip_if_exists and db_path.exists():
+        print(f"Skipping main build (DB exists and build_db.skip_if_exists=true): {db_path}")
+        # Always load playoff data when DB exists so playoff tables get populated/updated
+        # (e.g. if DB was built before playoff support, or new playoff raw files were added)
+        load_playoff_into_db(raw_dir, db_path, seasons=seasons)
+    else:
         load_raw_into_db(raw_dir, db_path, seasons=seasons)
         load_playoff_into_db(raw_dir, db_path, seasons=seasons)
 

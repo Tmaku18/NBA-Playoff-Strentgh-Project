@@ -62,19 +62,28 @@ def attention_ablation(
     top_k: int = 3,
     metric_fn: Any = None,
 ) -> float:
-    """Mask top-attention players (set stats to 0 and mask=True), run model, return metric. Compare to random mask."""
+    """Mask top-attention players (set stats to 0 and mask=True), run model, return metric. Skips padded positions (mask=True). Returns nan if forward yields non-finite scores."""
     B, P, S = stats.shape
-    _, top_idx = attn_weights.topk(top_k, dim=-1)
     stats_masked = stats.clone()
     mask_masked = mask.clone()
     for b in range(B):
-        for i in range(top_k):
-            idx = top_idx[b, i].item()
+        # Only consider non-padded positions (mask[b, i] is False)
+        valid = (mask[b] == False).nonzero(as_tuple=True)[0]
+        if valid.numel() == 0:
+            continue
+        k_use = min(top_k, valid.numel())
+        attn_b = attn_weights[b]
+        attn_valid = attn_b[valid]
+        _, order = attn_valid.topk(k_use, largest=True)
+        top_indices = valid[order]
+        for idx in top_indices.tolist():
             if idx < P:
                 stats_masked[b, idx, :] = 0
                 mask_masked[b, idx] = True
     with torch.no_grad():
         s_ablate, _, _ = model(emb, stats_masked, minutes, mask_masked)
+    if not torch.isfinite(s_ablate).all():
+        return float("nan")
     if metric_fn is not None:
         return float(metric_fn(s_ablate))
     return float(s_ablate.mean().item())

@@ -15,7 +15,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 
 ## Key Design Choices
 - **Target:** Future W/L (next 5) or Final Playoff Seed — **never** efficiency.
-- **True Strength:** Latent **Z** from Deep Set penultimate layer; score mapped to percentile within conference.
+- **True Strength:** Model A produces a latent **Z** (penultimate layer); the **output** `true_strength_score` is the **ensemble** score (RidgeCV blend of A + XGB + RF) mapped to percentile (0–1 and 0–100).
 - **No Net Rating leakage:** `net_rating` is excluded as a model input and never used as a target or evaluation metric (allowed only in baselines).
 - **Stacking:** K-fold **OOF** across **all training seasons**; level-2 **RidgeCV** on pooled OOF (not Logistic Regression).
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
@@ -48,7 +48,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 ---
 
 ## Outputs (per run)
-- **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **true strength score** (0–1 and 0–100), **championship odds** (softmax with `output.odds_temperature`).
+- **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **true strength score** (0–1 and 0–100; derived from the stacked ensemble, not Model A’s Z alone), **championship odds** (softmax with `output.odds_temperature`).
 - **Actual rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date.
 - **Playoff rank** and **rank_delta_playoffs** (when playoff data exists for the target season).
 - Classification: **Sleeper** (under-ranked by standings), **Paper Tiger** (over-ranked), **Aligned**.
@@ -73,11 +73,13 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
    - `python -m scripts.4b_train_stacking` — merge OOF parquets, RidgeCV → `outputs/ridgecv_meta.joblib`, `outputs/oof_pooled.parquet` (requires OOF from 3 and 4).
 5. **Inference:** `python -m scripts.6_run_inference` — load DB and models, run Model A/B + meta → `outputs/<run_id>/predictions.json`, plots. With `inference.run_id: null`, run_id auto-increments (run_002, run_003, …) so each full pipeline run gets a new folder.
 6. **Evaluation:** `python -m scripts.5_evaluate` — uses predictions from the latest (or configured) run_id → `outputs/eval_report.json` (NDCG, Spearman, MRR, ROC-AUC upset).
-7. **Explainability:** `python -m scripts.5b_explain` — SHAP on real team-context X, attention ablation on real list batch → `outputs/shap_summary.png`.
+7. **Explainability:** `python -m scripts.5b_explain` — SHAP on Model B (team-context X) → `outputs/shap_summary.png`; attention ablation and Integrated Gradients (Model A) when Captum is installed → `outputs/ig_model_a_attributions.txt`. Attention ablation skips padded roster slots and reports clearly when the masked forward yields NaN.
 
 **Optional:** `python -m scripts.run_manifest` (run manifest); `python -m scripts.run_leakage_tests` (before training).
 
 **Pipeline behavior:** Script 1 reuses raw files that already exist (no re-download). Script 2 skips rebuilding the DB when `build_db.skip_if_exists` is true and the DB file exists; set it to false to force a full rebuild from raw. With `inference.run_id: null`, inference writes to the next run folder (run_002, run_003, …) and evaluation uses the latest run.
+
+**Training notes:** Model A (script 3) subsamples conference-date lists for OOF and final training (`training.max_lists_oof`, `training.max_final_batches`) and `build_lists` subsamples dates (e.g. 200) for speed; use full list set by increasing these in config or adjusting `build_lists`.
 
 ---
 
@@ -102,6 +104,7 @@ All paths under `outputs/` (or `config.paths.outputs`). Produced from real data 
 - `outputs/run_001/title_contender_scatter.png` — championship odds vs regular-season wins (proxy).
 - `outputs/run_001/odds_top10.png` — top-10 championship odds bar chart.
 - `outputs/shap_summary.png` — Model B (RF) SHAP summary on real team-context features (script 5b).
+- `outputs/ig_model_a_attributions.txt` — Model A Integrated Gradients top-5 player indices by attribution L2 norm (script 5b; requires Captum).
 - `outputs/oof_pooled.parquet`, `outputs/ridgecv_meta.joblib` — stacking meta-learner and pooled OOF (script 4b).
 - `outputs/oof_model_a.parquet`, `outputs/oof_model_b.parquet` — OOF from scripts 3 and 4 (Option A: K-fold, real data).
 - `outputs/best_deep_set.pt`, `outputs/xgb_model.joblib`, `outputs/rf_model.joblib` — trained Model A and Model B.

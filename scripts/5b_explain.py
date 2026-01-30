@@ -1,4 +1,5 @@
 """Run SHAP (Model B) and attention ablation (Model A) on real data from DB."""
+import math
 import sys
 from pathlib import Path
 
@@ -101,7 +102,42 @@ def main():
                     _, _, attn = model(emb, stats, minu, msk)
                 top_k = min(2, attn.shape[-1])
                 v = attention_ablation(model, emb, stats, minu, msk, attn, top_k=top_k)
-                print("Attention ablation (top-%d masked) score mean: %s" % (top_k, v))
+                if not math.isfinite(v):
+                    print("Attention ablation (top-%d masked) score mean: NaN (masked forward produced non-finite scores)" % top_k)
+                else:
+                    print("Attention ablation (top-%d masked) score mean: %s" % (top_k, v))
+
+                # Integrated Gradients for Model A (one team, optional)
+                try:
+                    from src.viz.integrated_gradients import ig_attr, _HAS_CAPTUM
+                    if not _HAS_CAPTUM:
+                        print("Integrated Gradients skipped (captum not installed).")
+                    else:
+                        n_steps = 50
+                        emb_1 = emb[0:1]
+                        stats_1 = stats[0:1]
+                        minu_1 = minu[0:1]
+                        msk_1 = msk[0:1]
+                        attr, delta = ig_attr(model, emb_1, stats_1, minu_1, msk_1, n_steps=n_steps)
+                        if attr is not None and attr.numel() > 0:
+                            # attr (1, P, S); L2 norm per player
+                            norms = torch.norm(attr[0].float(), dim=1)
+                            k = min(5, norms.shape[0])
+                            _, top_idx = norms.topk(k, largest=True)
+                            lines = ["Integrated Gradients (Model A) top-%d player indices by attribution L2 norm:" % k]
+                            for i, idx in enumerate(top_idx.tolist(), 1):
+                                lines.append("  %d. player_idx=%d norm=%.4f" % (i, idx, norms[idx].item()))
+                            summary = "\n".join(lines)
+                            print(summary)
+                            ig_path = out / "ig_model_a_attributions.txt"
+                            ig_path.write_text(summary, encoding="utf-8")
+                            print("Wrote", ig_path)
+                        else:
+                            print("Integrated Gradients: no attributions (empty result).")
+                except ImportError:
+                    print("Integrated Gradients skipped (captum not installed).")
+                except Exception as e:
+                    print("Integrated Gradients failed:", e, file=sys.stderr)
     except Exception as e:
         print("Attention ablation failed:", e, file=sys.stderr)
         sys.exit(1)

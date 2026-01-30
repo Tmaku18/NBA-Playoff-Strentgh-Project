@@ -91,6 +91,30 @@ def predict_batches(
     return scores_list
 
 
+def predict_batches_with_attention(
+    model: nn.Module,
+    batches: list[dict],
+    device: torch.device,
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    """Run model in eval mode; return (scores_list, attn_weights_list). attn_weights_list[i] is (K, P)."""
+    model.eval()
+    scores_list: list[torch.Tensor] = []
+    attn_list: list[torch.Tensor] = []
+    with torch.no_grad():
+        for batch in batches:
+            B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
+            embs = batch["embedding_indices"].to(device).reshape(B * K, P)
+            stats = batch["player_stats"].to(device).reshape(B * K, P, S)
+            minutes = batch["minutes"].to(device).reshape(B * K, P)
+            mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
+            score, _, attn_w = model(embs, stats, minutes, mask)
+            score = score.reshape(B, K)
+            attn_w = attn_w.reshape(B, K, P)
+            scores_list.append(score.cpu())
+            attn_list.append(attn_w.cpu())
+    return scores_list, attn_list
+
+
 def _build_model(config: dict, device: torch.device) -> nn.Module:
     ma = config.get("model_a", {})
     num_emb = ma.get("num_embeddings", 500)
