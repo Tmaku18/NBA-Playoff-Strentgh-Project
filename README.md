@@ -15,7 +15,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 
 ## Key Design Choices
 - **Target:** Future W/L (next 5) or Final Playoff Seed — **never** efficiency.
-- **True Strength:** Model A produces a latent **Z** (penultimate layer); the **output** `true_strength_score` is the **ensemble** score (RidgeCV blend of A + XGB + RF) mapped to percentile (0–1 and 0–100).
+- **True Strength:** Model A produces a latent **Z** (penultimate layer); the **output** `ensemble_score` is the **ensemble** score (RidgeCV blend of A + XGB + RF) mapped to percentile (0–1 and 0–100).
 - **No Net Rating leakage:** `net_rating` is excluded as a model input and never used as a target or evaluation metric (allowed only in baselines).
 - **Stacking:** K-fold **OOF** across **all training seasons**; level-2 **RidgeCV** on pooled OOF (not Logistic Regression).
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
@@ -35,12 +35,12 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 ---
 
 ## Playoff performance rank (ground truth)
-Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Teams with 0 playoff wins are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`).
+Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Teams with 0 playoff wins are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`). Playoff rank is computed from `playoff_team_game_logs` + `playoff_games`; it will be null if playoff data is missing or season mapping fails.
 
 ## Evaluation
 - **Ranking:** NDCG, Spearman, MRR (MRR uses top_k=2 for two-conference “rank 1”).
 - **Future outcomes:** Brier score.
-- **Sleeper detection:** ROC-AUC on upsets (sleeper = actual conference rank > predicted league rank); constant-label guard returns 0.5.
+- **Sleeper detection:** ROC-AUC on upsets (sleeper = actual rank worse than predicted rank); constant-label guard returns 0.5.
 - **Playoff metrics** (when playoff data and predictions include playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), Brier score on championship odds (one-hot champion vs predicted odds). Section `playoff_metrics` in `eval_report.json`.
 - **Report:** `eval_report.json` includes `notes` and, when applicable, `playoff_metrics`.
 - **Baselines:** rank-by-SRS, rank-by-Net-Rating, **Dummy** (e.g. previous-season rank or rank-by-net-rating).
@@ -48,10 +48,10 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 ---
 
 ## Outputs (per run)
-- **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **true strength score** (0–1 and 0–100; derived from the stacked ensemble, not Model A’s Z alone), **championship odds** (softmax with `output.odds_temperature`).
-- **Actual rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date. When available, `actual_global_rank` (1–30) is included for global evaluation/classification.
+- **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **ensemble score** (0–1 and 0–100; derived from the stacked ensemble, not Model A’s Z alone), **championship odds** (softmax with `output.odds_temperature`).
+- **EOS_conference_rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date. When available, `EOS_global_rank` (1–30) is included for global evaluation/classification.
 - **Playoff rank** and **rank_delta_playoffs** (when playoff data exists for the target season).
-- Classification: **Sleeper** (under-ranked by standings), **Paper Tiger** (over-ranked), **Aligned**.
+- Classification: **Over-ranked**, **Under-ranked**, **Aligned**.
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
 - Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum).
 - **Plots:** `pred_vs_actual.png` — two panels (East/West), conference rank vs actual conference rank (1–15); `pred_vs_playoff_rank.png` — global rank vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
@@ -98,7 +98,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 All paths under `outputs/` (or `config.paths.outputs`). Produced from real data when DB and models exist. With `inference.run_id: null`, each pipeline run writes to a new folder (`outputs/run_002/`, `outputs/run_003/`, …); evaluation uses the latest run.
 
 - `outputs/eval_report.json` — NDCG, Spearman, MRR (top_k=2), ROC-AUC upset, `notes`; when playoff data exists, `playoff_metrics` (Spearman vs playoff rank, NDCG@4, Brier championship).
-- `outputs/run_001/predictions.json` — per-team `global_rank` (1–30), `conference_rank` (1–15), `championship_odds`, `true_strength_score` (0–1 percentile), `actual_rank` (conference), `actual_global_rank` (1–30 when available), `playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
+- `outputs/run_001/predictions.json` — per-team `predicted_strength` (rank), `global_rank` (1–30), `conference_rank` (1–15), `championship_odds`, `ensemble_score` (0–1 percentile), `EOS_conference_rank`, `EOS_global_rank` (1–30 when available), `playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
 - `outputs/run_001/pred_vs_actual.png` — two panels (East/West): predicted vs actual conference rank (1–15); grid lines, team-colored points, legend.
 - `outputs/run_001/pred_vs_playoff_rank.png` — predicted global rank (1–30) vs playoff performance rank (1–30).
 - `outputs/run_001/title_contender_scatter.png` — championship odds vs regular-season wins (proxy).
@@ -122,7 +122,7 @@ All paths under `outputs/` (or `config.paths.outputs`). Produced from real data 
 
 ## Recent implementation (Update2)
 
-Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batching fix** (Captum auxiliary tensors expanded to match batched inputs); **latest-team roster** (players only on current team as of `as_of_date`); **actual_global_rank** (1–30) for evaluation/classification; **manifest db_path** stored relative to project root; **conference plot** uses only valid conference ranks (no global fallback); **attention/IG** sanitized so `predictions.json` is valid JSON (`allow_nan=False`); **ensemble agreement** High/Medium/Low with scaled thresholds and handling of missing models; **playoff rank** tie-break (team_id) and safe win%; **true strength** percentile reaches 0.0/1.0. Optional: `output.ig_inference_top_k` and `output.ig_inference_steps` control IG in inference outputs.
+Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batching fix** (Captum auxiliary tensors expanded to match batched inputs); **latest-team roster** (players only on current team as of `as_of_date`); **EOS_global_rank** (1–30) for evaluation/classification; **manifest db_path** stored relative to project root; **conference plot** uses only valid conference ranks (no global fallback); **attention/IG** sanitized so `predictions.json` is valid JSON (`allow_nan=False`); **ensemble agreement** High/Medium/Low with scaled thresholds and handling of missing models; **ensemble_score** percentile reaches 0.0/1.0. Optional: `output.ig_inference_top_k` and `output.ig_inference_steps` control IG in inference outputs.
 
 ---
 

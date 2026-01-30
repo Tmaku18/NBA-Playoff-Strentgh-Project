@@ -1,4 +1,4 @@
-"""Inference: load A/B/stacker, produce per-team JSON (predicted_rank, true_strength, delta, ensemble, contributors)."""
+"""Inference: load A/B/stacker, produce per-team JSON (predicted_strength, ensemble_score, delta, contributors)."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def predict_teams(
 ) -> list[dict]:
     """
     Combine base scores, run meta if present. For each team output:
-    global_rank (1-30), conference_rank (1-15), predicted_rank (legacy), true_strength_score,
+    global_rank (1-30), conference_rank (1-15), predicted_strength (rank), ensemble_score,
     championship_odds, delta, classification, analysis.playoff_rank and rank_delta_playoffs when available.
     """
     n = len(team_ids)
@@ -145,17 +145,17 @@ def predict_teams(
         delta = (act_for_class - pred_rank[i]) if act_for_class is not None else None
         if delta is not None:
             if delta > 0:
-                classification = f"Sleeper (Under-ranked by {delta} slots)"
+                classification = f"Over-ranked by {delta} slots"
             elif delta < 0:
-                classification = f"Paper Tiger (Over-ranked by {-delta} slots)"
+                classification = f"Under-ranked by {-delta} slots"
             else:
                 classification = "Aligned"
         else:
             classification = "Unknown"
 
         # deep_set_rank: global rank (1-30) by Model A score. Note: Model A was trained with ListMLE
-        # on standings-ordered lists; actual_rank is that same list position. So deep_set_rank often
-        # matches actual_rank within conference—that is by design (same target), not independent accuracy.
+        # on standings-ordered lists; EOS_conference_rank is that same list position. So deep_set_rank often
+        # matches EOS_conference_rank within conference—that is by design (same target), not independent accuracy.
         r_a = np.argsort(np.argsort(-sa))[i] + 1 if model_presence.get("a", True) and len(sa) == n else None
         r_x = np.argsort(np.argsort(-sx))[i] + 1 if model_presence.get("xgb", True) and len(sx) == n else None
         r_r = np.argsort(np.argsort(-sr))[i] + 1 if model_presence.get("rf", True) and len(sr) == n else None
@@ -180,16 +180,16 @@ def predict_teams(
         rank_delta_playoffs = (p_rank - pred_rank[i]) if p_rank is not None else None
 
         pred_dict: dict[str, Any] = {
-            "predicted_rank": int(pred_rank[i]),
+            "predicted_strength": int(pred_rank[i]),
             "global_rank": int(pred_rank[i]),
-            "true_strength_score": float(tss[i]),
-            "true_strength_score_100": round(float(tss[i]) * 100.0, 1),
+            "ensemble_score": float(tss[i]),
+            "ensemble_score_100": round(float(tss[i]) * 100.0, 1),
             "conference_rank": conf_rank.get(tid),
             "championship_odds": f"{float(odds[i]) * 100:.1f}%",
         }
         analysis_dict: dict[str, Any] = {
-            "actual_rank": int(act) if act is not None else None,
-            "actual_global_rank": int(act_global) if act_global is not None else None,
+            "EOS_conference_rank": int(act) if act is not None else None,
+            "EOS_global_rank": int(act_global) if act_global is not None else None,
             "classification": classification,
             "playoff_rank": int(p_rank) if p_rank is not None else None,
             "rank_delta_playoffs": int(rank_delta_playoffs) if rank_delta_playoffs is not None else None,
@@ -309,6 +309,9 @@ def run_inference_from_db(
                         team_id_to_player_ids[tid] = [int(pid) if pid is not None else None for pid in player_ids]
                     attn_weights = attn_tensor[0, k].numpy() if attn_tensor.dim() >= 2 else attn_tensor[k].numpy()
                     attn_weights = np.nan_to_num(attn_weights, nan=0.0, posinf=0.0, neginf=0.0)
+                    max_len = min(len(player_ids), len(attn_weights))
+                    attn_weights = attn_weights[:max_len]
+                    player_ids = player_ids[:max_len]
                     order = np.argsort(-attn_weights)
                     contrib: list[tuple[str, float]] = []
                     for idx in order[:10]:
@@ -320,6 +323,17 @@ def run_inference_from_db(
                         pid = player_ids[idx]
                         name = player_id_to_name.get(int(pid), f"Player_{pid}")
                         contrib.append((name, w))
+                    if not contrib and max_len > 0:
+                        # Fallback: take top-k by raw weight even if <= 0, to avoid empty contributors
+                        for idx in order[:10]:
+                            if idx >= len(player_ids) or player_ids[idx] is None:
+                                continue
+                            w = float(attn_weights[idx])
+                            if not np.isfinite(w):
+                                continue
+                            pid = player_ids[idx]
+                            name = player_id_to_name.get(int(pid), f"Player_{pid}")
+                            contrib.append((name, w))
                     if contrib:
                         attention_by_team[tid] = contrib
     sa = np.array([tid_to_score_a.get(tid, 0.0) for tid in unique_team_ids], dtype=np.float32)
@@ -426,8 +440,15 @@ def run_inference_from_db(
                         stats = batch["player_stats"][:, k, :, :]
                         minu = batch["minutes"][:, k, :]
                         msk = batch["key_padding_mask"][:, k, :]
+                        with torch.no_grad():
+                            s_check, _, _ = model_a(emb, stats, minu, msk)
+                        if not torch.isfinite(s_check).all():
+                            continue
                         attr, _ = ig_attr(model_a, emb, stats, minu, msk, n_steps=ig_steps)
                         if attr is None or attr.numel() == 0:
+                            continue
+                        attr = torch.nan_to_num(attr, nan=0.0, posinf=0.0, neginf=0.0)
+                        if not torch.isfinite(attr).all():
                             continue
                         norms = torch.norm(attr[0].float(), dim=1)
                         if norms.numel() == 0:
@@ -479,7 +500,7 @@ def run_inference_from_db(
         points = []
         for t in pred_list:
             pr = t["prediction"].get("conference_rank")
-            ar = t["analysis"].get("actual_rank")
+            ar = t["analysis"].get("EOS_conference_rank")
             if pr is None or ar is None:
                 continue
             points.append((ar, pr, t["team_name"]))
@@ -515,10 +536,17 @@ def run_inference_from_db(
     # pred_vs_playoff_rank: global rank (1-30) vs playoff performance rank (1-30)
     if playoff_rank_map:
         fig2, ax2 = plt.subplots(figsize=(8, 6))
-        g_rank = [t["prediction"]["global_rank"] for t in preds]
-        p_rank = [t["analysis"].get("playoff_rank") for t in preds]
-        p_rank = [r if r is not None else 0 for r in p_rank]
-        names = [t["team_name"] for t in preds]
+        pts = [(t["analysis"].get("playoff_rank"), t["prediction"]["global_rank"], t["team_name"]) for t in preds if t["analysis"].get("playoff_rank") is not None]
+        if not pts:
+            ax2.text(0.5, 0.5, "No playoff ranks available", ha="center", va="center", transform=ax2.transAxes)
+            ax2.set_xlabel("Playoff performance rank (1-30)")
+            ax2.set_ylabel("Predicted global rank (1-30)")
+            ax2.set_title("Predicted global rank vs playoff performance rank")
+            ax2.grid(True, linestyle="--", alpha=0.7)
+            fig2.savefig(out / "pred_vs_playoff_rank.png", bbox_inches="tight")
+            plt.close(fig2)
+            # continue to other plots
+        p_rank, g_rank, names = zip(*pts)
         max_r = max(max(g_rank or [1]), max(p_rank or [1]), 1) + 1
         ax2.plot([0, max_r], [0, max_r], "k--", alpha=0.5, label="identity")
         cmap = plt.get_cmap("tab20")

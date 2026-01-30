@@ -56,11 +56,11 @@ def main():
     pred_ranks = []
     for t in teams:
         analysis = t.get("analysis", {})
-        act = analysis.get("actual_global_rank")
+        act = analysis.get("EOS_global_rank")
         if act is None:
-            act = analysis.get("actual_rank")
-        pred_rank = t.get("prediction", {}).get("predicted_rank")
-        tss = t.get("prediction", {}).get("true_strength_score")
+            act = analysis.get("EOS_conference_rank")
+        pred_rank = t.get("prediction", {}).get("predicted_strength")
+        tss = t.get("prediction", {}).get("ensemble_score")
         if act is not None:
             actual_ranks.append(act)
         else:
@@ -77,7 +77,7 @@ def main():
         print("Too few valid actual ranks for evaluation.", file=sys.stderr)
         sys.exit(1)
     m = evaluate_ranking(y_true_relevance, y_score, k=min(10, n))
-    # Upset: sleeper = actual_rank > predicted_rank (under-ranked by standings)
+    # Upset: sleeper = EOS_global_rank > predicted_strength (under-ranked by standings)
     delta = y_actual - np.array(pred_ranks, dtype=np.float32)
     y_bin = (delta > 0).astype(np.float32)
     if np.unique(y_bin).size >= 2:
@@ -86,7 +86,7 @@ def main():
     else:
         m["roc_auc_upset"] = 0.5
     m["notes"] = {
-        "upset_definition": "sleeper = actual_global_rank > predicted_rank (fallback to actual_rank when missing)",
+        "upset_definition": "sleeper = EOS_global_rank > predicted_strength (fallback to EOS_conference_rank when missing)",
         "mrr": "top_k=2; 1/rank of first max-relevance item in predicted order (two conferences).",
     }
 
@@ -94,7 +94,7 @@ def main():
     playoff_ranks = [t.get("analysis", {}).get("playoff_rank") for t in teams]
     if any(r is not None for r in playoff_ranks):
         p_rank = np.array([r if r is not None else 0 for r in playoff_ranks], dtype=np.float32)
-        g_rank = np.array([t.get("prediction", {}).get("global_rank") or t.get("prediction", {}).get("predicted_rank") or 0 for t in teams], dtype=np.float32)
+        g_rank = np.array([t.get("prediction", {}).get("global_rank") or t.get("prediction", {}).get("predicted_strength") or 0 for t in teams], dtype=np.float32)
         odds_str = [t.get("prediction", {}).get("championship_odds", "0%") for t in teams]
         odds_pct = np.array([float(s.rstrip("%")) / 100.0 for s in odds_str], dtype=np.float32)
         champion_onehot = (p_rank == 1).astype(np.float32)

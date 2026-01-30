@@ -120,6 +120,11 @@ def main():
                         msk_1 = msk[0:1]
                         attr, delta = ig_attr(model, emb_1, stats_1, minu_1, msk_1, n_steps=n_steps)
                         if attr is not None and attr.numel() > 0:
+                            attr = torch.nan_to_num(attr, nan=0.0, posinf=0.0, neginf=0.0)
+                            if not torch.isfinite(attr).all():
+                                print("Integrated Gradients: non-finite attributions after sanitization.")
+                                attr = None
+                        if attr is not None and attr.numel() > 0:
                             # attr (1, P, S); L2 norm per player
                             norms = torch.norm(attr[0].float(), dim=1)
                             k = min(5, norms.shape[0])

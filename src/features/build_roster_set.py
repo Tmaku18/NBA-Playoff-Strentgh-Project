@@ -38,6 +38,7 @@ def get_roster_as_of_date(
     if past.empty:
         return pd.DataFrame(columns=[player_id_col, "total_min", "rank"])
 
+    past_scoped = past
     if latest_team_map is None:
         latest_team_map = latest_team_map_as_of(
             pgl,
@@ -50,8 +51,9 @@ def get_roster_as_of_date(
     if latest_team_map:
         latest_team = past[player_id_col].map(latest_team_map)
         past = past.loc[latest_team == team_id]
+        # Fallback: if latest-team filter yields empty, use season-scoped roster
         if past.empty:
-            return pd.DataFrame(columns=[player_id_col, "total_min", "rank"])
+            past = past_scoped
 
     tot = past.groupby(player_id_col, as_index=False)[min_col].sum()
     tot = tot[tot[min_col] > 0].nlargest(n, min_col).reset_index(drop=True)
