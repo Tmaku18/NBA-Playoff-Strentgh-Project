@@ -26,11 +26,21 @@ class SetAttention(nn.Module):
         x: (B, P, D). key_padding_mask: (B, P) bool, True = ignore.
         minutes: (B, P) optional weights. Returns (out, attn_weights).
         """
-        # query from a single learned vector or mean; use mean of x as query for set-pooling
-        q = x.mean(dim=1, keepdim=True)  # (B, 1, D)
+        # query from a single learned vector or mean; use masked mean of x as query for set-pooling
+        if key_padding_mask is not None and key_padding_mask.shape[:2] == x.shape[:2]:
+            valid = (~key_padding_mask).unsqueeze(-1).float()
+            denom = valid.sum(dim=1, keepdim=True).clamp(min=1.0)
+            q = (x * valid).sum(dim=1, keepdim=True) / denom
+        else:
+            q = x.mean(dim=1, keepdim=True)  # (B, 1, D)
         out, w = self.attn(q, x, x, key_padding_mask=key_padding_mask, need_weights=True)
         # out (B, 1, D), w (B, 1, P)
         if minutes is not None and w.shape[-1] == minutes.shape[-1]:
-            w = w * minutes.unsqueeze(1).clamp(0, 1)
+            mins = minutes
+            if key_padding_mask is not None and key_padding_mask.shape == minutes.shape:
+                mins = mins.masked_fill(key_padding_mask, 0.0)
+            mins = mins.clamp(min=0.0)
+            mins = mins / (mins.sum(dim=-1, keepdim=True).clamp(min=1e-8))
+            w = w * (0.5 + 0.5 * mins.unsqueeze(1))
             w = w / (w.sum(dim=-1, keepdim=True) + 1e-8)
         return out.squeeze(1), w.squeeze(1)

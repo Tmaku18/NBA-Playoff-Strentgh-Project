@@ -5,26 +5,78 @@ from pathlib import Path
 import pandas as pd
 
 
+def _to_date(value: str | pd.Timestamp | None) -> pd.Timestamp | None:
+    if value is None:
+        return None
+    return pd.to_datetime(value).date()
+
+
+def _filter_by_date(
+    df: pd.DataFrame,
+    *,
+    date_col: str,
+    season_start: str | pd.Timestamp | None,
+    season_end: str | pd.Timestamp | None,
+) -> pd.DataFrame:
+    if df.empty or date_col not in df.columns:
+        return df
+    start = _to_date(season_start)
+    end = _to_date(season_end)
+    if start is None or end is None:
+        return df
+    dates = pd.to_datetime(df[date_col]).dt.date
+    return df[(dates >= start) & (dates <= end)]
+
+
+def _filtered_playoff_tgl(
+    playoff_games: pd.DataFrame,
+    playoff_tgl: pd.DataFrame,
+    season: str,
+    *,
+    season_start: str | pd.Timestamp | None = None,
+    season_end: str | pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    if playoff_games.empty or playoff_tgl.empty:
+        return pd.DataFrame()
+    pg = playoff_games.copy()
+    use_range = season_start is not None and season_end is not None
+    if use_range:
+        pg = _filter_by_date(pg, date_col="game_date", season_start=season_start, season_end=season_end)
+    elif "season" not in pg.columns and "game_date" in pg.columns:
+        pg["season"] = pd.to_datetime(pg["game_date"]).dt.to_period("Y").astype(str)
+    if pg.empty:
+        return pd.DataFrame()
+    if "season" in pg.columns and not use_range:
+        gids = set(pg.loc[pg["season"].astype(str) == str(season), "game_id"].astype(str))
+    else:
+        gids = set(pg["game_id"].astype(str))
+    if not gids:
+        return pd.DataFrame()
+    pt = playoff_tgl[playoff_tgl["game_id"].astype(str).isin(gids)]
+    return pt
+
+
 def get_playoff_wins(
     playoff_games: pd.DataFrame,
     playoff_tgl: pd.DataFrame,
     season: str,
+    *,
+    season_start: str | pd.Timestamp | None = None,
+    season_end: str | pd.Timestamp | None = None,
 ) -> dict[int, int]:
     """
     Playoff wins per team for one season (exclude Play-In; we use only games in playoff_* tables).
     Returns team_id -> count of wins (WL='W' in playoff_team_game_logs).
     """
-    if playoff_games.empty or playoff_tgl.empty:
+    pt = _filtered_playoff_tgl(
+        playoff_games,
+        playoff_tgl,
+        season,
+        season_start=season_start,
+        season_end=season_end,
+    )
+    if pt.empty:
         return {}
-    pg = playoff_games.copy()
-    pt = playoff_tgl.copy()
-    if "season" not in pg.columns and "game_date" in pg.columns:
-        pg["season"] = pd.to_datetime(pg["game_date"]).dt.to_period("Y").astype(str)
-    if "season" in pg.columns:
-        gids = set(pg.loc[pg["season"].astype(str) == str(season), "game_id"].astype(str))
-    else:
-        gids = set(pg["game_id"].astype(str))
-    pt = pt[pt["game_id"].astype(str).isin(gids)]
     wl_col = "wl" if "wl" in pt.columns else "WL"
     if wl_col not in pt.columns:
         return {}
@@ -37,16 +89,25 @@ def get_reg_season_win_pct(
     games: pd.DataFrame,
     tgl: pd.DataFrame,
     season: str,
+    *,
+    season_start: str | pd.Timestamp | None = None,
+    season_end: str | pd.Timestamp | None = None,
 ) -> dict[int, float]:
     """Regular-season win % per team for one season. Returns team_id -> win rate (0-1)."""
     if games.empty or tgl.empty:
         return {}
     g = games.copy()
     t = tgl.copy()
-    if "season" not in g.columns:
-        g["game_date"] = pd.to_datetime(g["game_date"])
-        g["season"] = g["game_date"].dt.year.astype(str)
-    g = g[g["season"].astype(str) == str(season)]
+    use_range = season_start is not None and season_end is not None
+    if use_range:
+        g = _filter_by_date(g, date_col="game_date", season_start=season_start, season_end=season_end)
+    else:
+        if "season" not in g.columns:
+            g["game_date"] = pd.to_datetime(g["game_date"])
+            g["season"] = g["game_date"].dt.year.astype(str)
+        g = g[g["season"].astype(str) == str(season)]
+    if g.empty:
+        return {}
     gids = set(g["game_id"].astype(str))
     t = t[t["game_id"].astype(str).isin(gids)]
     wl_col = "wl" if "wl" in t.columns else "WL"
@@ -65,6 +126,9 @@ def compute_playoff_performance_rank(
     tgl: pd.DataFrame,
     season: str,
     all_team_ids: list[int] | None = None,
+    *,
+    season_start: str | pd.Timestamp | None = None,
+    season_end: str | pd.Timestamp | None = None,
 ) -> dict[int, int]:
     """
     Playoff performance rank 1-30 for one season.
@@ -73,23 +137,45 @@ def compute_playoff_performance_rank(
     Phase 3: Teams with 0 playoff wins ranked 17-30 by regular-season win %.
     Returns team_id -> rank (1-30) for the top 30 teams by this scheme.
     """
-    pw = get_playoff_wins(playoff_games, playoff_tgl, season)
-    reg_wp = get_reg_season_win_pct(games, tgl, season)
+    pw = get_playoff_wins(
+        playoff_games,
+        playoff_tgl,
+        season,
+        season_start=season_start,
+        season_end=season_end,
+    )
+    reg_wp = get_reg_season_win_pct(
+        games,
+        tgl,
+        season,
+        season_start=season_start,
+        season_end=season_end,
+    )
+    pt = _filtered_playoff_tgl(
+        playoff_games,
+        playoff_tgl,
+        season,
+        season_start=season_start,
+        season_end=season_end,
+    )
+    playoff_team_ids = set(pt["team_id"].astype(int).tolist()) if not pt.empty else set()
     if all_team_ids is None:
         all_team_ids = sorted(set(list(pw.keys()) + list(reg_wp.keys())))
     if not all_team_ids:
+        return {}
+    if len(playoff_team_ids) < 16:
         return {}
 
     def _safe_wp(tid: int) -> float:
         v = reg_wp.get(tid, 0.0)
         return float(v) if pd.notna(v) else 0.0
 
-    # Teams with at least one playoff win: sort by (playoff_wins desc, reg_win_pct desc, team_id asc)
-    playoff_teams = [tid for tid in all_team_ids if pw.get(tid, 0) > 0]
+    # Playoff teams: anyone who appeared in playoff logs (includes 0-win teams)
+    playoff_teams = [tid for tid in all_team_ids if tid in playoff_team_ids]
     playoff_teams.sort(key=lambda t: (-pw.get(t, 0), -_safe_wp(t), t))
 
     # Lottery teams (0 playoff wins): sort by reg_win_pct desc, team_id asc
-    lottery = [tid for tid in all_team_ids if pw.get(tid, 0) == 0]
+    lottery = [tid for tid in all_team_ids if tid not in playoff_team_ids]
     lottery.sort(key=lambda t: (-_safe_wp(t), t))
 
     playoff_top = playoff_teams[:16]

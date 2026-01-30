@@ -71,6 +71,7 @@ def predict_teams(
     actual_ranks: dict[int, int] | None = None,
     actual_global_ranks: dict[int, int] | None = None,
     attention_by_team: dict[int, list[tuple[str, float]]] | None = None,
+    attention_fallback_by_team: dict[int, bool] | None = None,
     team_id_to_conference: dict[int, str] | None = None,
     playoff_rank: dict[int, int] | None = None,
     model_presence: dict[str, bool] | None = None,
@@ -134,6 +135,7 @@ def predict_teams(
     actual_ranks = actual_ranks or {}
     actual_global_ranks = actual_global_ranks or {}
     attention_by_team = attention_by_team or {}
+    attention_fallback_by_team = attention_fallback_by_team or {}
     playoff_rank = playoff_rank or {}
     model_presence = model_presence or {"a": True, "xgb": True, "rf": True}
 
@@ -201,7 +203,13 @@ def predict_teams(
             "prediction": pred_dict,
             "analysis": analysis_dict,
             "ensemble_diagnostics": {"model_agreement": agreement, "deep_set_rank": int(r_a) if r_a is not None else None, "xgboost_rank": int(r_x) if r_x is not None else None, "random_forest_rank": int(r_r) if r_r is not None else None},
-            "roster_dependence": {"primary_contributors": [{"player": str(p), "attention_weight": float(w)} for p, w in contrib if np.isfinite(w)]},
+            "roster_dependence": {
+                "primary_contributors": [
+                    {"player": str(p), "attention_weight": float(w)}
+                    for p, w in contrib if np.isfinite(w)
+                ],
+                "contributors_are_fallback": bool(attention_fallback_by_team.get(int(tid), False)),
+            },
         })
     return out
 
@@ -289,9 +297,11 @@ def run_inference_from_db(
     device = torch.device("cpu")  # Match load_models map_location="cpu"
     tid_to_score_a: dict[int, float] = {}
     attention_by_team: dict[int, list[tuple[str, float]]] = {}  # team_id -> [(player_name, weight), ...]
+    attention_fallback_by_team: dict[int, bool] = {}
     team_id_to_batch: dict[int, tuple[int, int]] = {}
     team_id_to_player_ids: dict[int, list[int | None]] = {}
     batches_a: list[dict[str, Any]] = []
+    attn_debug = {"teams": 0, "empty_roster": 0, "all_zero": 0, "attn_sum": [], "attn_max": []}
     if model_a is not None:
         batches_a, list_metas = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
         if batches_a:
@@ -312,6 +322,16 @@ def run_inference_from_db(
                     max_len = min(len(player_ids), len(attn_weights))
                     attn_weights = attn_weights[:max_len]
                     player_ids = player_ids[:max_len]
+                    if max_len == 0:
+                        attn_debug["empty_roster"] += 1
+                        continue
+                    attn_debug["teams"] += 1
+                    attn_sum = float(np.sum(attn_weights))
+                    attn_max = float(np.max(attn_weights)) if max_len else 0.0
+                    attn_debug["attn_sum"].append(attn_sum)
+                    attn_debug["attn_max"].append(attn_max)
+                    if attn_sum <= 0:
+                        attn_debug["all_zero"] += 1
                     order = np.argsort(-attn_weights)
                     contrib: list[tuple[str, float]] = []
                     for idx in order[:10]:
@@ -323,19 +343,35 @@ def run_inference_from_db(
                         pid = player_ids[idx]
                         name = player_id_to_name.get(int(pid), f"Player_{pid}")
                         contrib.append((name, w))
+                    fallback_used = False
                     if not contrib and max_len > 0:
                         # Fallback: take top-k by raw weight even if <= 0, to avoid empty contributors
+                        fallback_used = True
                         for idx in order[:10]:
                             if idx >= len(player_ids) or player_ids[idx] is None:
                                 continue
                             w = float(attn_weights[idx])
-                            if not np.isfinite(w):
+                            if not np.isfinite(w) or w <= 0:
                                 continue
                             pid = player_ids[idx]
                             name = player_id_to_name.get(int(pid), f"Player_{pid}")
                             contrib.append((name, w))
                     if contrib:
                         attention_by_team[tid] = contrib
+                    if fallback_used:
+                        attention_fallback_by_team[tid] = True
+    if attn_debug["teams"] > 0:
+        mean_sum = float(np.mean(attn_debug["attn_sum"])) if attn_debug["attn_sum"] else 0.0
+        mean_max = float(np.mean(attn_debug["attn_max"])) if attn_debug["attn_max"] else 0.0
+        print(
+            "Attention debug:",
+            f"teams={attn_debug['teams']}",
+            f"empty_roster={attn_debug['empty_roster']}",
+            f"all_zero={attn_debug['all_zero']}",
+            f"attn_sum_mean={mean_sum:.4f}",
+            f"attn_max_mean={mean_max:.4f}",
+            flush=True,
+        )
     sa = np.array([tid_to_score_a.get(tid, 0.0) for tid in unique_team_ids], dtype=np.float32)
 
     sx = np.zeros(len(unique_team_ids), dtype=np.float32)
@@ -378,11 +414,15 @@ def run_inference_from_db(
     playoff_rank_map: dict[int, int] = {}
     seasons_cfg = config.get("seasons") or {}
     target_season = None
+    season_start = None
+    season_end = None
     for season, rng in seasons_cfg.items():
         start = pd.to_datetime(rng.get("start")).date()
         end = pd.to_datetime(rng.get("end")).date()
         if start <= pd.to_datetime(as_of_date).date() <= end:
             target_season = season
+            season_start = rng.get("start")
+            season_end = rng.get("end")
             break
     if target_season:
         try:
@@ -393,6 +433,8 @@ def run_inference_from_db(
                 playoff_rank_map = compute_playoff_performance_rank(
                     pg, ptgl, games, tgl, target_season,
                     all_team_ids=unique_team_ids,
+                    season_start=season_start,
+                    season_end=season_end,
                 )
         except Exception:
             pass
@@ -407,6 +449,7 @@ def run_inference_from_db(
         actual_ranks=actual_ranks,
         actual_global_ranks=actual_global_rank,
         attention_by_team=attention_by_team if attention_by_team else None,
+        attention_fallback_by_team=attention_fallback_by_team if attention_fallback_by_team else None,
         team_id_to_conference=team_id_to_conf,
         playoff_rank=playoff_rank_map if playoff_rank_map else None,
         model_presence={"a": model_a is not None, "xgb": xgb is not None, "rf": rf is not None},

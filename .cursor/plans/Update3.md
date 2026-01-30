@@ -62,14 +62,14 @@ isProject: false
 
 - **fix-playoff-season-mapping** (HIGH PRIORITY)
   - Root cause: `get_reg_season_win_pct()` derives season as `dt.year` → `"2024"`, but pipeline passes `"2023-24"` → empty filter → all teams get 0 wins → ranks 17-30 only.
-  - Fix: Use **date-range filtering** instead of string matching:
+  - Fix: Prefer **date-range filtering** (from `config/defaults.yaml`) instead of string matching:
     - Add helper `is_game_in_season(game_date, season_start, season_end) -> bool`
-    - In `get_playoff_wins()` and `get_reg_season_win_pct()`, filter games where `season_start <= game_date <= season_end` using dates from config
+    - In `get_playoff_wins()` and `get_reg_season_win_pct()`, filter games where `season_start <= game_date <= season_end`
     - This avoids format mismatches entirely
 
 - **fix-query-masking** (HIGH PRIORITY - NEW)
   - Root cause: In `[src/models/set_attention.py](c:\Users\tmaku\OneDrive\Documents\GSU\Advanced Machine Learning\NBA Playoff Strentgh Project\src\models\set_attention.py)`, query is computed as `q = x.mean(dim=1)` which includes **padded positions** (zeros), diluting the query.
-  - Fix: Compute masked mean excluding padded positions:
+  - Fix: Use `key_padding_mask` to compute a masked mean (exclude padded positions):
     ```python
     # Instead of: q = x.mean(dim=1, keepdim=True)
     mask_expanded = key_padding_mask.unsqueeze(-1).float()
@@ -81,8 +81,8 @@ isProject: false
 - **increase-training-epochs** (HIGH PRIORITY - NEW)
   - Root cause: Training shows flat loss `27.8993` across all 3 epochs—insufficient iterations for convergence.
   - Fix in `[src/training/train_model_a.py](c:\Users\tmaku\OneDrive\Documents\GSU\Advanced Machine Learning\NBA Playoff Strentgh Project\src\training\train_model_a.py)`:
-    - Change `for epoch in range(3)` to `for epoch in range(20)` (or make configurable via `config["model_a"]["epochs"]`)
-    - Optionally add validation-based early stopping
+    - Make epochs configurable via `config["model_a"]["epochs"]` (default ~20)
+    - Log loss per epoch and optionally add validation-based early stopping
 
 - **fix-playoff-team-detection**
   - Update `compute_playoff_performance_rank()` to define "playoff teams" as **teams that appear in the filtered playoff logs** (played at least one playoff game), not `playoff_wins > 0`.

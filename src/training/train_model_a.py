@@ -13,6 +13,47 @@ from src.models.listmle_loss import listmle_loss
 from src.utils.repro import set_seeds
 
 
+def _log_attention_debug_stats(model: nn.Module, batch: dict, device: torch.device) -> None:
+    """Log one-shot attention diagnostics: mask/minutes/attn sums + grad norm."""
+    B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
+    embs = batch["embedding_indices"].to(device).reshape(B * K, P)
+    stats = batch["player_stats"].to(device).reshape(B * K, P, S)
+    minutes = batch["minutes"].to(device).reshape(B * K, P)
+    mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
+
+    model.train()
+    model.zero_grad(set_to_none=True)
+    score, _, attn_w = model(embs, stats, minutes, mask)
+    loss = score.mean()
+    if torch.isfinite(loss).all():
+        loss.backward()
+    grad_norm = 0.0
+    for p in model.attn.parameters():
+        if p.grad is not None:
+            grad_norm += p.grad.data.norm(2).item()
+    model.zero_grad(set_to_none=True)
+
+    with torch.no_grad():
+        attn_w = attn_w.reshape(B, K, P)
+        all_masked = mask.reshape(B, K, P).all(dim=-1)
+        valid_mask = ~mask
+        minutes_valid = minutes[valid_mask]
+        attn_sum = attn_w.sum(dim=-1).reshape(-1)
+        attn_max = attn_w.max(dim=-1).values.reshape(-1)
+        print(
+            "Attention debug (train):",
+            f"teams={attn_sum.numel()}",
+            f"all_masked={int(all_masked.sum().item())}",
+            f"minutes_min={float(minutes_valid.min().item()) if minutes_valid.numel() else 0.0:.4f}",
+            f"minutes_mean={float(minutes_valid.mean().item()) if minutes_valid.numel() else 0.0:.4f}",
+            f"minutes_max={float(minutes_valid.max().item()) if minutes_valid.numel() else 0.0:.4f}",
+            f"attn_sum_mean={float(attn_sum.mean().item()) if attn_sum.numel() else 0.0:.4f}",
+            f"attn_max_mean={float(attn_max.mean().item()) if attn_max.numel() else 0.0:.4f}",
+            f"attn_grad_norm={grad_norm:.4f}",
+            flush=True,
+        )
+
+
 def get_dummy_batch(
     batch_size: int = 4,
     num_teams_per_list: int = 10,
@@ -68,6 +109,46 @@ def train_epoch(
             total += loss.item()
             n += 1
     return total / n if n else 0.0
+
+
+def eval_epoch(
+    model: nn.Module,
+    batches: list[dict],
+    device: torch.device,
+) -> float:
+    model.eval()
+    total = 0.0
+    n = 0
+    with torch.no_grad():
+        for batch in batches:
+            B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
+            embs = batch["embedding_indices"].to(device).reshape(B * K, P)
+            stats = batch["player_stats"].to(device).reshape(B * K, P, S)
+            minutes = batch["minutes"].to(device).reshape(B * K, P)
+            mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
+            rel = batch["rel"].to(device)
+
+            score, _, _ = model(embs, stats, minutes, mask)
+            score = score.reshape(B, K)
+            score = torch.nan_to_num(score, nan=0.0, posinf=10.0, neginf=-10.0)
+            loss = listmle_loss(score, rel)
+            if torch.isfinite(loss).all():
+                total += loss.item()
+                n += 1
+    return total / n if n else 0.0
+
+
+def _split_train_val(
+    batches: list[dict],
+    val_frac: float,
+) -> tuple[list[dict], list[dict]]:
+    if not batches or val_frac <= 0:
+        return batches, []
+    n = len(batches)
+    if n < 5:
+        return batches, []
+    n_val = max(1, int(n * val_frac))
+    return batches[:-n_val], batches[-n_val:]
 
 
 def predict_batches(
@@ -130,7 +211,9 @@ def train_model_a_on_batches(
     config: dict,
     batches: list[dict],
     device: torch.device,
-    max_epochs: int = 3,
+    max_epochs: int | None = None,
+    *,
+    val_batches: list[dict] | None = None,
 ) -> nn.Module:
     """Train Model A on given batches; return the model (do not save). For OOF fold training."""
     stat_dim = 7
@@ -141,8 +224,27 @@ def train_model_a_on_batches(
         return model
     model = _build_model(config, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    for epoch in range(max_epochs):
+    epochs = int(max_epochs) if max_epochs is not None else int(ma.get("epochs", 20))
+    patience = int(ma.get("early_stopping_patience", 3))
+    min_delta = float(ma.get("early_stopping_min_delta", 0.0))
+    use_early = bool(val_batches) and patience > 0
+    best_val = float("inf")
+    best_state = None
+    bad_epochs = 0
+    for epoch in range(epochs):
         train_epoch(model, batches, optimizer, device)
+        if use_early:
+            val_loss = eval_epoch(model, val_batches or [], device)
+            if val_loss + min_delta < best_val:
+                best_val = val_loss
+                best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                bad_epochs = 0
+            else:
+                bad_epochs += 1
+            if bad_epochs >= patience:
+                break
+    if best_state is not None:
+        model.load_state_dict(best_state)
     return model
 
 
@@ -171,9 +273,37 @@ def train_model_a(
         batches = [get_dummy_batch(4, 10, 15, stat_dim, num_emb, device) for _ in range(5)]
     if not batches:
         batches = [get_dummy_batch(4, 10, 15, stat_dim, num_emb, device) for _ in range(5)]
-    for epoch in range(3):
-        loss = train_epoch(model, batches, optimizer, device)
+    epochs = int(ma.get("epochs", 20))
+    val_frac = float(ma.get("early_stopping_val_frac", 0.1))
+    patience = int(ma.get("early_stopping_patience", 3))
+    min_delta = float(ma.get("early_stopping_min_delta", 0.0))
+    train_batches, val_batches = _split_train_val(batches, val_frac)
+    use_early = bool(val_batches) and patience > 0
+    best_val = float("inf")
+    best_state = None
+    bad_epochs = 0
+    for epoch in range(epochs):
+        loss = train_epoch(model, train_batches, optimizer, device)
         print(f"epoch {epoch+1} loss={loss:.4f}")
+        if use_early:
+            val_loss = eval_epoch(model, val_batches, device)
+            print(f"val_loss {epoch+1}: {val_loss:.4f}")
+            if val_loss + min_delta < best_val:
+                best_val = val_loss
+                best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                bad_epochs = 0
+            else:
+                bad_epochs += 1
+            if bad_epochs >= patience:
+                break
+    if best_state is not None:
+        model.load_state_dict(best_state)
+
+    if batches:
+        try:
+            _log_attention_debug_stats(model, batches[0], device)
+        except Exception:
+            pass
 
     path = output_dir / "best_deep_set.pt"
     torch.save({"model_state": model.state_dict(), "config": config}, path)

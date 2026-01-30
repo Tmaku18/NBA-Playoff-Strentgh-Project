@@ -95,7 +95,14 @@ def main():
         val_metas = [list_metas[i] for i in val_idx]
         if not train_batches or not val_batches:
             continue
-        model = train_model_a_on_batches(config, train_batches, device, max_epochs=3)
+        epochs = int((config.get("model_a") or {}).get("epochs", 20))
+        model = train_model_a_on_batches(
+            config,
+            train_batches,
+            device,
+            max_epochs=epochs,
+            val_batches=val_batches,
+        )
         scores_list = predict_batches(model, val_batches, device)
         for score_tensor, meta in zip(scores_list, val_metas):
             K = score_tensor.shape[1]

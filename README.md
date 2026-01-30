@@ -19,6 +19,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 - **No Net Rating leakage:** `net_rating` is excluded as a model input and never used as a target or evaluation metric (allowed only in baselines).
 - **Stacking:** K-fold **OOF** across **all training seasons**; level-2 **RidgeCV** on pooled OOF (not Logistic Regression).
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
+- **Model A training:** epochs configurable via `model_a.epochs` with optional validation-based early stopping (`early_stopping_*` in `defaults.yaml`).
 - **Season config:** Hard-coded season date ranges in `defaults.yaml` to avoid play-in ambiguity.
 - **Explainability:** SHAP on Model B only; Integrated Gradients or permutation ablation for Model A.
 
@@ -35,7 +36,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 ---
 
 ## Playoff performance rank (ground truth)
-Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Teams with 0 playoff wins are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`). Playoff rank is computed from `playoff_team_game_logs` + `playoff_games`; it will be null if playoff data is missing or season mapping fails.
+Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Non-playoff teams are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`). Playoff rank is computed from `playoff_team_game_logs` + `playoff_games` using **season date ranges** from `defaults.yaml`; it will be null if playoff data is missing or incomplete for the target season.
 
 ## Evaluation
 - **Ranking:** NDCG, Spearman, MRR (MRR uses top_k=2 for two-conference “rank 1”).
@@ -53,7 +54,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - **Playoff rank** and **rank_delta_playoffs** (when playoff data exists for the target season).
 - Classification: **Over-ranked**, **Under-ranked**, **Aligned**.
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
-- Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum).
+- Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum). `contributors_are_fallback` indicates when attention weights were not usable.
 - **Plots:** `pred_vs_actual.png` — two panels (East/West), conference rank vs actual conference rank (1–15); `pred_vs_playoff_rank.png` — global rank vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
 - **Report assets:** `outputs/ANALYSIS.md` — human-readable analysis of pipeline outputs, interpretations, and known issues.
 
@@ -80,7 +81,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 
 **Pipeline behavior:** Script 1 reuses raw files that already exist (no re-download). Script 2 skips rebuilding the DB when `build_db.skip_if_exists` is true and the DB file exists; set it to false to force a full rebuild from raw. With `inference.run_id: null`, inference writes to the next run folder (run_002, run_003, …) and evaluation uses the latest run.
 
-**Training notes:** Model A (script 3) subsamples conference-date lists for OOF and final training (`training.max_lists_oof`, `training.max_final_batches`) and `build_lists` subsamples dates (e.g. 200) for speed; use full list set by increasing these in config or adjusting `build_lists`.
+**Training notes:** Model A (script 3) subsamples conference-date lists for OOF and final training (`training.max_lists_oof`, `training.max_final_batches`) and `build_lists` subsamples dates (e.g. 200) for speed; use full list set by increasing these in config or adjusting `build_lists`. Configure training length and early stopping with `model_a.epochs`, `model_a.early_stopping_patience`, `model_a.early_stopping_min_delta`, `model_a.early_stopping_val_frac`.
 
 ---
 

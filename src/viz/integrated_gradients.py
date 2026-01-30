@@ -91,9 +91,11 @@ def attention_ablation(
     for b in range(B):
         # Only consider non-padded positions (mask[b, i] is False)
         valid = (mask[b] == False).nonzero(as_tuple=True)[0]
-        if valid.numel() == 0:
+        if valid.numel() <= 1:
             continue
-        k_use = min(top_k, valid.numel())
+        k_use = min(top_k, valid.numel() - 1)
+        if k_use <= 0:
+            continue
         attn_b = attn_weights[b]
         attn_valid = attn_b[valid]
         _, order = attn_valid.topk(k_use, largest=True)

@@ -34,6 +34,10 @@ model_a:
   encoder_hidden: [128, 64]
   attention_heads: 4
   dropout: 0.2
+  epochs: 20
+  early_stopping_patience: 3
+  early_stopping_min_delta: 0.0
+  early_stopping_val_frac: 0.1
 
 model_b:
   xgb:

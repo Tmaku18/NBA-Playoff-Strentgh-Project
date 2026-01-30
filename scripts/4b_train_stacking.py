@@ -70,9 +70,14 @@ def main():
                 seasons_cfg = config.get("seasons") or {}
                 playoff_rank_by_season: dict[str, dict[int, int]] = {}
                 for season in seasons_cfg:
+                    rng = seasons_cfg.get(season, {})
+                    season_start = rng.get("start")
+                    season_end = rng.get("end")
                     playoff_rank_by_season[season] = compute_playoff_performance_rank(
                         pg, ptgl, games, tgl, season,
                         all_team_ids=teams["team_id"].astype(int).unique().tolist() if not teams.empty else None,
+                        season_start=season_start,
+                        season_end=season_end,
                     )
                 y_list = []
                 for _, row in merged.iterrows():
