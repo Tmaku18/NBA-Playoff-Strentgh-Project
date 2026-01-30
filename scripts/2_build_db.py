@@ -18,11 +18,18 @@ def main():
         cfg = yaml.safe_load(f)
     raw_dir = Path(cfg["paths"]["raw"])
     db_path = Path(cfg["paths"]["db"])
+    if not db_path.is_absolute():
+        db_path = ROOT / db_path
     seasons = list(cfg.get("seasons", {}).keys())
+    skip_if_exists = cfg.get("build_db", {}).get("skip_if_exists", False)
 
-    from src.data.db_loader import load_raw_into_db
+    if skip_if_exists and db_path.exists():
+        print(f"Skipping build (DB exists and build_db.skip_if_exists=true): {db_path}")
+    else:
+        from src.data.db_loader import load_playoff_into_db, load_raw_into_db
 
-    load_raw_into_db(raw_dir, db_path, seasons=seasons)
+        load_raw_into_db(raw_dir, db_path, seasons=seasons)
+        load_playoff_into_db(raw_dir, db_path, seasons=seasons)
 
     manifest_path = ROOT / "data" / "manifest.json"
     manifest = {}

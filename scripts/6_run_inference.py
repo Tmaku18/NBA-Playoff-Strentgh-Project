@@ -25,7 +25,7 @@ def main():
     except RuntimeError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)
-    print(f"Wrote {p} and {out / run_id / 'pred_vs_actual.png'}")
+    print(f"Wrote {p}, pred_vs_actual.png, pred_vs_playoff_rank.png, odds_top10.png, title_contender_scatter.png")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,22 @@ def main():
                     manifest["raw"][path.name] = h
             except Exception as e:
                 print(f"Skip {season} {kind}: {e}")
+    # Playoff logs (Playoffs only; Play-In excluded when computing playoff wins)
+    for season in seasons:
+        y1, y2 = season.split("-")[0], season.split("-")[1]
+        for kind, ext in [("T", "parquet"), ("P", "parquet")]:
+            try:
+                df = fetch_season_logs(
+                    season, raw_dir, kind=kind, use_cache=True, cache_fmt=ext,
+                    season_type="Playoffs",
+                )
+                stem = "playoffs_team_logs" if kind == "T" else "playoffs_player_logs"
+                path = raw_dir / f"{stem}_{y1}_{y2}.{ext}"
+                if path.exists():
+                    h = hashlib.sha256(path.read_bytes()).hexdigest()
+                    manifest["raw"][path.name] = h
+            except Exception as e:
+                print(f"Skip playoffs {season} {kind}: {e}")
 
     manifest["timestamps"] = {"download": str(Path(__file__).stat().st_mtime)}
     out = ROOT / "data" / "manifest.json"

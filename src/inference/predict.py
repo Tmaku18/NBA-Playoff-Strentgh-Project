@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import torch
 
 
@@ -60,12 +61,16 @@ def predict_teams(
     meta_model: Any = None,
     actual_ranks: dict[int, int] | None = None,
     attention_by_team: dict[int, list[tuple[str, float]]] | None = None,
+    team_id_to_conference: dict[int, str] | None = None,
+    playoff_rank: dict[int, int] | None = None,
     *,
     true_strength_scale: str = "percentile",
+    odds_temperature: float = 1.0,
 ) -> list[dict]:
     """
     Combine base scores, run meta if present. For each team output:
-    predicted_rank, true_strength_score, delta (actual - predicted), classification, ensemble_diagnostics, primary_contributors.
+    global_rank (1-30), conference_rank (1-15), predicted_rank (legacy), true_strength_score,
+    championship_odds, delta, classification, analysis.playoff_rank and rank_delta_playoffs when available.
     """
     n = len(team_ids)
     if model_a_scores is not None and len(model_a_scores) == n:
@@ -90,14 +95,32 @@ def predict_teams(
     else:
         ens = (sa + sx + sr) / 3.0
 
-    pred_rank = np.argsort(np.argsort(-ens)) + 1
+    pred_rank = np.argsort(np.argsort(-ens)) + 1  # global rank 1-30
     if true_strength_scale == "percentile":
         tss = (np.argsort(np.argsort(ens)) + 1).astype(float) / (n + 1)
     else:
         tss = (ens - ens.min()) / (ens.max() - ens.min() + 1e-12)
 
+    # Championship odds: softmax(ens / temperature)
+    T = max(odds_temperature, 1e-6)
+    exp_s = np.exp(np.clip(ens / T, -50, 50))
+    odds = exp_s / exp_s.sum()
+
+    # Conference rank (1-15 within E/W)
+    team_id_to_conf = team_id_to_conference or {}
+    conf_rank: dict[int, int] = {}
+    for conf in ("E", "W"):
+        idx = [i for i in range(n) if team_id_to_conf.get(team_ids[i], "E") == conf]
+        if not idx:
+            continue
+        sub_ens = ens[idx]
+        sub_rank = np.argsort(np.argsort(-sub_ens)) + 1
+        for k, i in enumerate(idx):
+            conf_rank[team_ids[i]] = int(sub_rank[k])
+
     actual_ranks = actual_ranks or {}
     attention_by_team = attention_by_team or {}
+    playoff_rank = playoff_rank or {}
 
     out = []
     for i, (tid, tname) in enumerate(zip(team_ids, team_names)):
@@ -120,12 +143,29 @@ def predict_teams(
         agreement = "High" if spread <= 2 else "Low"
 
         contrib = attention_by_team.get(tid, [])
+        p_rank = playoff_rank.get(tid)
+        rank_delta_playoffs = (p_rank - pred_rank[i]) if p_rank is not None else None
+
+        pred_dict: dict[str, Any] = {
+            "predicted_rank": int(pred_rank[i]),
+            "global_rank": int(pred_rank[i]),
+            "true_strength_score": float(tss[i]),
+            "true_strength_score_100": round(float(tss[i]) * 100.0, 1),
+            "conference_rank": conf_rank.get(tid),
+            "championship_odds": f"{float(odds[i]) * 100:.1f}%",
+        }
+        analysis_dict: dict[str, Any] = {
+            "actual_rank": int(act) if act is not None else None,
+            "classification": classification,
+            "playoff_rank": int(p_rank) if p_rank is not None else None,
+            "rank_delta_playoffs": int(rank_delta_playoffs) if rank_delta_playoffs is not None else None,
+        }
 
         out.append({
             "team_id": int(tid),
             "team_name": tname,
-            "prediction": {"predicted_rank": int(pred_rank[i]), "true_strength_score": float(tss[i])},
-            "analysis": {"actual_rank": int(act) if act is not None else None, "classification": classification},
+            "prediction": pred_dict,
+            "analysis": analysis_dict,
             "ensemble_diagnostics": {"model_agreement": agreement, "deep_set_rank": int(r_a) if r_a is not None else None, "xgboost_rank": int(r_x) if r_x is not None else None, "random_forest_rank": int(r_r) if r_r is not None else None},
             "roster_dependence": {"primary_contributors": [{"player": str(p), "attention_weight": float(w)} for p, w in contrib]},
         })
@@ -225,21 +265,7 @@ def run_inference_from_db(
         name = r["name"].iloc[0] if not r.empty and "name" in r.columns else f"Team_{tid}"
         team_names.append(str(name))
 
-    preds = predict_teams(
-        unique_team_ids,
-        team_names,
-        model_a_scores=sa,
-        xgb_scores=sx,
-        rf_scores=sr,
-        meta_model=meta,
-        actual_ranks=actual_ranks,
-        true_strength_scale=config.get("output", {}).get("true_strength_scale", "percentile"),
-    )
-    pj = out / "predictions.json"
-    with open(pj, "w", encoding="utf-8") as f:
-        json.dump({"teams": preds}, f, indent=2)
-
-    # Resolve conference per team: from teams.conference or TEAM_CONFERENCE by abbreviation
+    # Conference map for conference_rank and plot
     team_id_to_conf: dict[int, str] = {}
     abbr_col = "abbreviation" if "abbreviation" in teams.columns else "ABBREVIATION"
     conf_col = "conference" if "conference" in teams.columns else "CONFERENCE"
@@ -252,6 +278,47 @@ def run_inference_from_db(
         else:
             abbr = row.get(abbr_col)
             team_id_to_conf[tid] = TEAM_CONFERENCE.get(str(abbr).strip() if abbr is not None else "", "E")
+
+    # Playoff rank for target season (when available)
+    playoff_rank_map: dict[int, int] = {}
+    seasons_cfg = config.get("seasons") or {}
+    target_season = None
+    for season, rng in seasons_cfg.items():
+        start = pd.to_datetime(rng.get("start")).date()
+        end = pd.to_datetime(rng.get("end")).date()
+        if start <= pd.to_datetime(as_of_date).date() <= end:
+            target_season = season
+            break
+    if target_season:
+        try:
+            from src.data.db_loader import load_playoff_data
+            from src.evaluation.playoffs import compute_playoff_performance_rank
+            pg, ptgl, _ = load_playoff_data(db_path)
+            if not pg.empty and not ptgl.empty:
+                playoff_rank_map = compute_playoff_performance_rank(
+                    pg, ptgl, games, tgl, target_season,
+                    all_team_ids=unique_team_ids,
+                )
+        except Exception:
+            pass
+
+    preds = predict_teams(
+        unique_team_ids,
+        team_names,
+        model_a_scores=sa,
+        xgb_scores=sx,
+        rf_scores=sr,
+        meta_model=meta,
+        actual_ranks=actual_ranks,
+        team_id_to_conference=team_id_to_conf,
+        playoff_rank=playoff_rank_map if playoff_rank_map else None,
+        true_strength_scale=config.get("output", {}).get("true_strength_scale", "percentile"),
+        odds_temperature=float(config.get("output", {}).get("odds_temperature", 1.0)),
+    )
+    pj = out / "predictions.json"
+    with open(pj, "w", encoding="utf-8") as f:
+        json.dump({"teams": preds}, f, indent=2)
+
     east_preds = [t for t in preds if team_id_to_conf.get(t["team_id"], "E") == "E"]
     west_preds = [t for t in preds if team_id_to_conf.get(t["team_id"], "W") == "W"]
 
@@ -261,12 +328,13 @@ def run_inference_from_db(
         if not pred_list:
             ax.text(0.5, 0.5, f"No {title} teams", ha="center", va="center", transform=ax.transAxes)
             ax.set_title(title)
-            ax.set_xlabel("Actual rank")
-            ax.set_ylabel("Predicted rank")
+            ax.set_xlabel("Actual conference rank")
+            ax.set_ylabel("Predicted conference rank")
             ax.grid(True, linestyle="--", alpha=0.7)
             return
-        pr = [t["prediction"]["predicted_rank"] for t in pred_list]
+        pr = [t["prediction"].get("conference_rank") or t["prediction"]["predicted_rank"] for t in pred_list]
         ar = [t["analysis"]["actual_rank"] for t in pred_list]
+        pr = [p if p is not None else 0 for p in pr]
         ar = [a if a is not None else 0 for a in ar]
         names = [t["team_name"] for t in pred_list]
         max_r = max(max(ar or [1]), max(pr or [1]), 1) + 1
@@ -275,8 +343,8 @@ def run_inference_from_db(
         for i, (a, p) in enumerate(zip(ar, pr)):
             color = cmap(i % 20)
             ax.scatter(a, p, c=[color], label=names[i], s=60, edgecolors="k", linewidths=0.5)
-        ax.set_xlabel("Actual rank")
-        ax.set_ylabel("Predicted rank")
+        ax.set_xlabel("Actual conference rank")
+        ax.set_ylabel("Predicted conference rank")
         ax.set_title(title)
         ax.grid(True, linestyle="--", alpha=0.7)
         ax.legend(loc="best", fontsize=7, ncol=2)
@@ -285,10 +353,67 @@ def run_inference_from_db(
 
     _draw_panel(ax_east, east_preds, "East")
     _draw_panel(ax_west, west_preds, "West")
-    fig.suptitle("Predicted vs actual rank", fontsize=12)
+    fig.suptitle("Predicted vs actual rank (conference rank 1-15)", fontsize=12)
     fig.tight_layout()
     fig.savefig(out / "pred_vs_actual.png", bbox_inches="tight")
     plt.close()
+
+    # pred_vs_playoff_rank: global rank (1-30) vs playoff performance rank (1-30)
+    if playoff_rank_map:
+        fig2, ax2 = plt.subplots(figsize=(8, 6))
+        g_rank = [t["prediction"]["global_rank"] for t in preds]
+        p_rank = [t["analysis"].get("playoff_rank") for t in preds]
+        p_rank = [r if r is not None else 0 for r in p_rank]
+        names = [t["team_name"] for t in preds]
+        max_r = max(max(g_rank or [1]), max(p_rank or [1]), 1) + 1
+        ax2.plot([0, max_r], [0, max_r], "k--", alpha=0.5, label="identity")
+        cmap = plt.get_cmap("tab20")
+        for i, (g, p) in enumerate(zip(g_rank, p_rank)):
+            ax2.scatter(p, g, c=[cmap(i % 20)], label=names[i], s=50, edgecolors="k", linewidths=0.5)
+        ax2.set_xlabel("Playoff performance rank (1-30)")
+        ax2.set_ylabel("Predicted global rank (1-30)")
+        ax2.set_title("Predicted global rank vs playoff performance rank")
+        ax2.grid(True, linestyle="--", alpha=0.7)
+        ax2.legend(loc="best", fontsize=6, ncol=2)
+        ax2.set_xlim(-0.5, max_r)
+        ax2.set_ylim(-0.5, max_r)
+        fig2.savefig(out / "pred_vs_playoff_rank.png", bbox_inches="tight")
+        plt.close(fig2)
+
+    # Championship odds top-10 bar chart
+    sorted_preds = sorted(preds, key=lambda t: float(t["prediction"]["championship_odds"].rstrip("%")), reverse=True)[:10]
+    if sorted_preds:
+        fig3, ax3 = plt.subplots(figsize=(10, 5))
+        names10 = [t["team_name"] for t in sorted_preds]
+        odds10 = [float(t["prediction"]["championship_odds"].rstrip("%")) for t in sorted_preds]
+        ax3.barh(range(len(names10)), odds10, color=plt.cm.viridis(np.linspace(0.2, 0.8, len(names10))))
+        ax3.set_yticks(range(len(names10)))
+        ax3.set_yticklabels(names10, fontsize=9)
+        ax3.set_xlabel("Championship odds (%)")
+        ax3.set_title("Top 10 championship odds")
+        ax3.grid(True, axis="x", linestyle="--", alpha=0.7)
+        fig3.tight_layout()
+        fig3.savefig(out / "odds_top10.png", bbox_inches="tight")
+        plt.close(fig3)
+
+    # Title contender scatter: championship odds vs regular-season wins (win rate * games proxy)
+    team_id_to_wins: dict[int, float] = team_id_to_win_rate
+    n_games = 82.0
+    fig4, ax4 = plt.subplots(figsize=(8, 6))
+    odds_pct = [float(t["prediction"]["championship_odds"].rstrip("%")) for t in preds]
+    wins_proxy = [team_id_to_wins.get(t["team_id"], 0.0) * n_games for t in preds]
+    names = [t["team_name"] for t in preds]
+    for i in range(len(preds)):
+        ax4.scatter(wins_proxy[i], odds_pct[i], s=80, label=names[i], alpha=0.8)
+    ax4.set_xlabel("Regular-season wins (proxy from standings-to-date win rate × 82)")
+    ax4.set_ylabel("Championship odds (%)")
+    ax4.set_title("Title contender: odds vs wins (top-left = sleeper)")
+    ax4.legend(loc="center left", bbox_to_anchor=(1, 0.5), fontsize=7)
+    ax4.grid(True, linestyle="--", alpha=0.7)
+    fig4.tight_layout()
+    fig4.savefig(out / "title_contender_scatter.png", bbox_inches="tight")
+    plt.close(fig4)
+
     return pj
 
 

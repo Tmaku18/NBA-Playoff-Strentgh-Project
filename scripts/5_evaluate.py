@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.evaluation.evaluate import evaluate_ranking, evaluate_upset
+from src.evaluation.metrics import brier_champion, ndcg_at_4, spearman
 
 
 def main():
@@ -64,6 +65,22 @@ def main():
         "upset_definition": "sleeper = actual_rank > predicted_rank (under-ranked by standings)",
         "mrr": "top_k=2; 1/rank of first max-relevance item in predicted order (two conferences).",
     }
+
+    # Playoff metrics (when playoff_rank and championship_odds present)
+    playoff_ranks = [t.get("analysis", {}).get("playoff_rank") for t in teams]
+    if any(r is not None for r in playoff_ranks):
+        p_rank = np.array([r if r is not None else 0 for r in playoff_ranks], dtype=np.float32)
+        g_rank = np.array([t.get("prediction", {}).get("global_rank") or t.get("prediction", {}).get("predicted_rank") or 0 for t in teams], dtype=np.float32)
+        odds_str = [t.get("prediction", {}).get("championship_odds", "0%") for t in teams]
+        odds_pct = np.array([float(s.rstrip("%")) / 100.0 for s in odds_str], dtype=np.float32)
+        champion_onehot = (p_rank == 1).astype(np.float32)
+        m["playoff_metrics"] = {
+            "spearman_pred_vs_playoff_rank": float(spearman(p_rank, g_rank)),
+            "ndcg_at_4_final_four": float(ndcg_at_4(p_rank, -g_rank)),
+            "brier_championship_odds": float(brier_champion(champion_onehot, odds_pct)),
+        }
+        m["notes"]["playoff_metrics"] = "Spearman (pred global vs playoff rank), NDCG@4 (final four), Brier (champion vs odds)."
+
     out = out_dir / "eval_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:

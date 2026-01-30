@@ -21,6 +21,10 @@ paths:
   processed: "data/processed"
   outputs: "outputs"
 
+# Skip rebuilding DB if file already exists (saves existing DB; set false to force rebuild from raw)
+build_db:
+  skip_if_exists: true
+
 repro:
   seed: 42
 
@@ -46,6 +50,8 @@ training:
   n_folds: 5
   rolling_windows: [10, 30]
   roster_size: 15
+  target_rank: "standings"  # or "playoffs" to train meta on playoff performance rank
 
 output:
   true_strength_scale: "percentile"  # or softmax, platt
+  odds_temperature: 1.0  # softmax temperature for championship odds

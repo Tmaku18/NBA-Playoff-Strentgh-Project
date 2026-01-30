@@ -25,31 +25,36 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 ---
 
 ## Data Sources
-- **nba_api** (official): play-by-play, player/team logs, tracking data.
+- **nba_api** (official): play-by-play, player/team logs, tracking data; **playoff** game logs (SeasonType=Playoffs) for validation. Play-In games are excluded from playoff win counts.
 - **Kaggle (Wyatt Walsh):** **primary** for SOS/SRS and historical validation.
 - **Basketball-Reference:** **fallback** for SOS/SRS when Kaggle unavailable.
 - **Proxy SOS:** If both are unavailable, compute from internal DB (e.g. opponent win-rate) and document.
 
-**Storage:** DuckDB preferred; SQLite allowed with pre-aggregation + indexing.
+**Storage:** DuckDB preferred (regular-season + separate playoff tables: `playoff_games`, `playoff_team_game_logs`, `playoff_player_game_logs`).
 
 ---
+
+## Playoff performance rank (ground truth)
+Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Teams with 0 playoff wins are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`).
 
 ## Evaluation
 - **Ranking:** NDCG, Spearman, MRR (MRR uses top_k=2 for two-conference “rank 1”).
 - **Future outcomes:** Brier score.
 - **Sleeper detection:** ROC-AUC on upsets (sleeper = actual conference rank > predicted league rank); constant-label guard returns 0.5.
-- **Report:** `eval_report.json` includes a `notes` field (upset definition, MRR description).
+- **Playoff metrics** (when playoff data and predictions include playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), Brier score on championship odds (one-hot champion vs predicted odds). Section `playoff_metrics` in `eval_report.json`.
+- **Report:** `eval_report.json` includes `notes` and, when applicable, `playoff_metrics`.
 - **Baselines:** rank-by-SRS, rank-by-Net-Rating, **Dummy** (e.g. previous-season rank or rank-by-net-rating).
 
 ---
 
 ## Outputs (per run)
-- **Predicted rank** (1–30, league-wide) and true strength score (0–1).
+- **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **true strength score** (0–1 and 0–100), **championship odds** (softmax with `output.odds_temperature`).
 - **Actual rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date.
+- **Playoff rank** and **rank_delta_playoffs** (when playoff data exists for the target season).
 - Classification: **Sleeper** (under-ranked by standings), **Paper Tiger** (over-ranked), **Aligned**.
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
 - Roster dependence (attention weights when available).
-- `pred_vs_actual.png`: two panels (East and West); x-axis = actual conference rank (1–15), y-axis = predicted league rank (1–30); grid lines, team-colored points, and legend.
+- **Plots:** `pred_vs_actual.png` — two panels (East/West), conference rank vs actual conference rank (1–15); `pred_vs_playoff_rank.png` — global rank vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
 
 ---
 
@@ -66,7 +71,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
    - `python -m scripts.3_train_model_a` — K-fold OOF → `outputs/oof_model_a.parquet`, then final model → `outputs/best_deep_set.pt`.  
    - `python -m scripts.4_train_model_b` — K-fold OOF → `outputs/oof_model_b.parquet`, then XGB + RF → `outputs/xgb_model.joblib`, `outputs/rf_model.joblib`.  
    - `python -m scripts.4b_train_stacking` — merge OOF parquets, RidgeCV → `outputs/ridgecv_meta.joblib`, `outputs/oof_pooled.parquet` (requires OOF from 3 and 4).
-5. **Inference:** `python -m scripts.6_run_inference` — load DB and models, run Model A/B + meta → `outputs/run_001/predictions.json`, `outputs/run_001/pred_vs_actual.png`.
+5. **Inference:** `python -m scripts.6_run_inference` — load DB and models, run Model A/B + meta → `outputs/run_001/predictions.json`, `pred_vs_actual.png`, `pred_vs_playoff_rank.png`, `odds_top10.png`, `title_contender_scatter.png`.
 6. **Evaluation:** `python -m scripts.5_evaluate` — uses predictions from step 6 (inference) → `outputs/eval_report.json` (NDCG, Spearman, MRR, ROC-AUC upset).
 7. **Explainability:** `python -m scripts.5b_explain` — SHAP on real team-context X, attention ablation on real list batch → `outputs/shap_summary.png`.
 
@@ -104,19 +109,6 @@ All paths under `outputs/` (or `config.paths.outputs`). Produced from real data 
 - **Manifests:** `outputs/run_manifest.json` (config snapshot, git hash, data manifest hash). `data/manifest.json` (raw/processed hashes).
 - **OOF:** `outputs/oof_pooled.parquet` and `ridgecv_meta.joblib`.
 - **Season boundaries:** Hard-coded in `config/defaults.yaml` to avoid play-in ambiguity.
-
----
-
-## Planned updates (Update1)
-
-The following extensions are planned (see [.cursor/plans/Update1.md](.cursor/plans/Update1.md)):
-
-- **Playoff data:** Ingest playoff game logs (nba_api, SeasonType=Playoffs) into separate DuckDB tables (`playoff_games`, `playoff_team_game_logs`, `playoff_player_game_logs`). Play-In games excluded from playoff win counts.
-- **Playoff performance rank (1–30):** Ground truth by (1) playoff wins, (2) tie-break by regular-season win %, (3) non-playoff teams 17–30 by regular-season record. Used for training (optional) and evaluation.
-- **Config:** `training.target_rank: standings | playoffs` (default `standings`); `output.odds_temperature` for championship odds.
-- **Prediction outputs:** `global_rank` (1–30), `conference_rank` (1–15 per conference), `championship_odds` (softmax with temperature), `analysis.playoff_rank` and `rank_delta_playoffs` when playoff data exists.
-- **Visuals:** `pred_vs_actual.png` updated to conference rank vs actual conference rank (same scale); new `pred_vs_playoff_rank.png`, `title_contender_scatter.png`, `odds_top10.png`, `sleeper_timeline.png`.
-- **Evaluation:** Spearman vs playoff rank, NDCG@4 (final four), Brier score on championship odds; `eval_report.json` section `playoff_metrics`.
 
 ---
 

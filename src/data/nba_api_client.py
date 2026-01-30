@@ -29,20 +29,22 @@ def fetch_season_logs(
     kind: str = "T",
     use_cache: bool = True,
     cache_fmt: str = "parquet",
+    season_type: str = "Regular Season",
 ) -> pd.DataFrame:
     """
     Fetch LeagueGameLog for one season.
     kind: 'T' = team logs, 'P' = player logs.
+    season_type: 'Regular Season' or 'Playoffs' (Play-In excluded when using Playoffs).
     Writes to raw_dir and returns DataFrame. Uses cache if use_cache and file exists.
     """
     raw_dir = Path(raw_dir)
     raw_dir.mkdir(parents=True, exist_ok=True)
-    # map to API: P or T
     abbrev = "P" if kind.upper() == "P" else "T"
     season_api = _season_to_api(season)
     suf = "team" if kind.upper() == "T" else "player"
     y1, y2 = season_api.split("-")[0], season_api.split("-")[1]
-    stem = f"{suf}_logs_{y1}_{y2}"
+    prefix = "playoffs_" if season_type == "Playoffs" else ""
+    stem = f"{prefix}{suf}_logs_{y1}_{y2}"
     cache_path = raw_dir / f"{stem}.{cache_fmt}"
 
     if use_cache and cache_path.exists():
@@ -57,6 +59,7 @@ def fetch_season_logs(
     ep = LeagueGameLog(
         player_or_team_abbreviation=abbrev,
         season=season_api,
+        season_type_all_star=season_type,
     )
     df = ep.get_data_frames()[0]
     if df is None or df.empty:
