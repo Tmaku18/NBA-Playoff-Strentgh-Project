@@ -4,6 +4,7 @@ data/processed/*
 !data/processed/.gitkeep
 outputs/*
 !outputs/.gitkeep
+!outputs/ANALYSIS.md
 __pycache__/
 *.py[cod]
 *.egg-info/

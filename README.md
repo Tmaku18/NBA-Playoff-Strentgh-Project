@@ -55,6 +55,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
 - Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum).
 - **Plots:** `pred_vs_actual.png` — two panels (East/West), conference rank vs actual conference rank (1–15); `pred_vs_playoff_rank.png` — global rank vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
+- **Report assets:** `outputs/ANALYSIS.md` — human-readable analysis of pipeline outputs, interpretations, and known issues.
 
 ---
 
