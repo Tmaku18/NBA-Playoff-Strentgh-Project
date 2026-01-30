@@ -58,7 +58,11 @@ def main():
         analysis = t.get("analysis", {})
         act = analysis.get("EOS_global_rank")
         if act is None:
+            act = analysis.get("actual_global_rank")
+        if act is None:
             act = analysis.get("EOS_conference_rank")
+        if act is None:
+            act = analysis.get("actual_rank")
         pred_rank = t.get("prediction", {}).get("predicted_strength")
         tss = t.get("prediction", {}).get("ensemble_score")
         if act is not None:
