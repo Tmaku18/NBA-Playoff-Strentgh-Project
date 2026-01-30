@@ -107,12 +107,26 @@ All paths under `outputs/` (or `config.paths.outputs`). Produced from real data 
 
 ---
 
+## Planned updates (Update1)
+
+The following extensions are planned (see [.cursor/plans/Update1.md](.cursor/plans/Update1.md)):
+
+- **Playoff data:** Ingest playoff game logs (nba_api, SeasonType=Playoffs) into separate DuckDB tables (`playoff_games`, `playoff_team_game_logs`, `playoff_player_game_logs`). Play-In games excluded from playoff win counts.
+- **Playoff performance rank (1–30):** Ground truth by (1) playoff wins, (2) tie-break by regular-season win %, (3) non-playoff teams 17–30 by regular-season record. Used for training (optional) and evaluation.
+- **Config:** `training.target_rank: standings | playoffs` (default `standings`); `output.odds_temperature` for championship odds.
+- **Prediction outputs:** `global_rank` (1–30), `conference_rank` (1–15 per conference), `championship_odds` (softmax with temperature), `analysis.playoff_rank` and `rank_delta_playoffs` when playoff data exists.
+- **Visuals:** `pred_vs_actual.png` updated to conference rank vs actual conference rank (same scale); new `pred_vs_playoff_rank.png`, `title_contender_scatter.png`, `odds_top10.png`, `sleeper_timeline.png`.
+- **Evaluation:** Spearman vs playoff rank, NDCG@4 (final four), Brier score on championship odds; `eval_report.json` section `playoff_metrics`.
+
+---
+
 ## Full Plan
 
-See `.cursor/plans/Plan.md`.
+See `.cursor/plans/Plan.md`. Planned extension: [.cursor/plans/Update1.md](.cursor/plans/Update1.md).
 
 ---
 
 ## Implementation Roadmap
 The full phased development plan and file-by-file checklist are in
 `.cursor/plans/Plan.md` under **Development and Implementation Plan**.
+Update1 roadmap: `.cursor/plans/Update1.md`.
