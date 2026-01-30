@@ -49,11 +49,11 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 
 ## Outputs (per run)
 - **Global rank** (1–30, league-wide), **conference rank** (1–15 within East/West), **true strength score** (0–1 and 0–100; derived from the stacked ensemble, not Model A’s Z alone), **championship odds** (softmax with `output.odds_temperature`).
-- **Actual rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date.
+- **Actual rank** in outputs and plots is conference standing (1–15 within East or West), from standings-to-date at the inference target date. When available, `actual_global_rank` (1–30) is included for global evaluation/classification.
 - **Playoff rank** and **rank_delta_playoffs** (when playoff data exists for the target season).
 - Classification: **Sleeper** (under-ranked by standings), **Paper Tiger** (over-ranked), **Aligned**.
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
-- Roster dependence (attention weights when available).
+- Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum).
 - **Plots:** `pred_vs_actual.png` — two panels (East/West), conference rank vs actual conference rank (1–15); `pred_vs_playoff_rank.png` — global rank vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
 
 ---
@@ -86,7 +86,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 ## Anti-Leakage Checklist
 
 - [ ] **Time rule:** All features use only rows with `game_date < as_of_date` (strict t-1). Rolling stats use `shift(1)` before aggregation.
-- [ ] **Roster:** Minutes and roster selection use only games before `as_of_date`.
+- [ ] **Roster:** Minutes and roster selection use only games before `as_of_date`. Rosters use a **latest-team** map (player’s most recent team as of `as_of_date`) so traded players appear only on their current team; season boundaries from config scope games when building rosters.
 - [ ] **Model B:** Feature set must **not** include `net_rating`. Enforced in `src.features.team_context.FORBIDDEN` and `train_model_b`.
 - [ ] **ListMLE:** Targets are standings-to-date (win-rate), not season-end. Evaluation remains season-end.
 - [ ] **Baselines only:** Net Rating is used only in `rank-by-Net-Rating` baseline, computed from off/def ratings, never as a model input.
@@ -98,7 +98,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 All paths under `outputs/` (or `config.paths.outputs`). Produced from real data when DB and models exist. With `inference.run_id: null`, each pipeline run writes to a new folder (`outputs/run_002/`, `outputs/run_003/`, …); evaluation uses the latest run.
 
 - `outputs/eval_report.json` — NDCG, Spearman, MRR (top_k=2), ROC-AUC upset, `notes`; when playoff data exists, `playoff_metrics` (Spearman vs playoff rank, NDCG@4, Brier championship).
-- `outputs/run_001/predictions.json` — per-team `global_rank` (1–30), `conference_rank` (1–15), `championship_odds`, `true_strength_score`, `playoff_rank`/`rank_delta_playoffs` (when available), classification, ensemble diagnostics.
+- `outputs/run_001/predictions.json` — per-team `global_rank` (1–30), `conference_rank` (1–15), `championship_odds`, `true_strength_score` (0–1 percentile), `actual_rank` (conference), `actual_global_rank` (1–30 when available), `playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
 - `outputs/run_001/pred_vs_actual.png` — two panels (East/West): predicted vs actual conference rank (1–15); grid lines, team-colored points, legend.
 - `outputs/run_001/pred_vs_playoff_rank.png` — predicted global rank (1–30) vs playoff performance rank (1–30).
 - `outputs/run_001/title_contender_scatter.png` — championship odds vs regular-season wins (proxy).
@@ -114,9 +114,15 @@ All paths under `outputs/` (or `config.paths.outputs`). Produced from real data 
 ## Reproducibility
 
 - **Seeds:** `src.utils.repro.set_seeds(seed)` for random, numpy, torch.
-- **Manifests:** `outputs/run_manifest.json` (config snapshot, git hash, data manifest hash). `data/manifest.json` (raw/processed hashes).
+- **Manifests:** `outputs/run_manifest.json` (config snapshot, git hash, data manifest hash). `data/manifest.json` (raw/processed hashes; `db_path` is stored relative to project root for portability).
 - **OOF:** `outputs/oof_pooled.parquet` and `ridgecv_meta.joblib`.
 - **Season boundaries:** Hard-coded in `config/defaults.yaml` to avoid play-in ambiguity.
+
+---
+
+## Recent implementation (Update2)
+
+Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batching fix** (Captum auxiliary tensors expanded to match batched inputs); **latest-team roster** (players only on current team as of `as_of_date`); **actual_global_rank** (1–30) for evaluation/classification; **manifest db_path** stored relative to project root; **conference plot** uses only valid conference ranks (no global fallback); **attention/IG** sanitized so `predictions.json` is valid JSON (`allow_nan=False`); **ensemble agreement** High/Medium/Low with scaled thresholds and handling of missing models; **playoff rank** tie-break (team_id) and safe win%; **true strength** percentile reaches 0.0/1.0. Optional: `output.ig_inference_top_k` and `output.ig_inference_steps` control IG in inference outputs.
 
 ---
 

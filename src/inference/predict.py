@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -68,9 +69,11 @@ def predict_teams(
     rf_scores: np.ndarray | None = None,
     meta_model: Any = None,
     actual_ranks: dict[int, int] | None = None,
+    actual_global_ranks: dict[int, int] | None = None,
     attention_by_team: dict[int, list[tuple[str, float]]] | None = None,
     team_id_to_conference: dict[int, str] | None = None,
     playoff_rank: dict[int, int] | None = None,
+    model_presence: dict[str, bool] | None = None,
     *,
     true_strength_scale: str = "percentile",
     odds_temperature: float = 1.0,
@@ -102,10 +105,12 @@ def predict_teams(
         ens = meta_model.predict(X).ravel()
     else:
         ens = (sa + sx + sr) / 3.0
+    ens = np.nan_to_num(ens, nan=0.0, posinf=0.0, neginf=0.0)
 
     pred_rank = np.argsort(np.argsort(-ens)) + 1  # global rank 1-30
     if true_strength_scale == "percentile":
-        tss = (np.argsort(np.argsort(ens)) + 1).astype(float) / (n + 1)
+        rank_order = (np.argsort(np.argsort(ens)) + 1).astype(float)
+        tss = (rank_order - 1.0) / (n - 1) if n > 1 else np.zeros(n)
     else:
         tss = (ens - ens.min()) / (ens.max() - ens.min() + 1e-12)
 
@@ -127,13 +132,17 @@ def predict_teams(
             conf_rank[team_ids[i]] = int(sub_rank[k])
 
     actual_ranks = actual_ranks or {}
+    actual_global_ranks = actual_global_ranks or {}
     attention_by_team = attention_by_team or {}
     playoff_rank = playoff_rank or {}
+    model_presence = model_presence or {"a": True, "xgb": True, "rf": True}
 
     out = []
     for i, (tid, tname) in enumerate(zip(team_ids, team_names)):
         act = actual_ranks.get(tid)
-        delta = (act - pred_rank[i]) if act is not None else None
+        act_global = actual_global_ranks.get(tid)
+        act_for_class = act_global if act_global is not None else act
+        delta = (act_for_class - pred_rank[i]) if act_for_class is not None else None
         if delta is not None:
             if delta > 0:
                 classification = f"Sleeper (Under-ranked by {delta} slots)"
@@ -147,11 +156,24 @@ def predict_teams(
         # deep_set_rank: global rank (1-30) by Model A score. Note: Model A was trained with ListMLE
         # on standings-ordered lists; actual_rank is that same list position. So deep_set_rank often
         # matches actual_rank within conference—that is by design (same target), not independent accuracy.
-        r_a = np.argsort(np.argsort(-sa))[i] + 1 if len(sa) == n else None
-        r_x = np.argsort(np.argsort(-sx))[i] + 1 if len(sx) == n else None
-        r_r = np.argsort(np.argsort(-sr))[i] + 1 if len(sr) == n else None
-        spread = max(r or 0 for r in [r_a, r_x, r_r]) - min(r or 0 for r in [r_a, r_x, r_r]) if any([r_a, r_x, r_r]) else 0
-        agreement = "High" if spread <= 2 else "Low"
+        r_a = np.argsort(np.argsort(-sa))[i] + 1 if model_presence.get("a", True) and len(sa) == n else None
+        r_x = np.argsort(np.argsort(-sx))[i] + 1 if model_presence.get("xgb", True) and len(sx) == n else None
+        r_r = np.argsort(np.argsort(-sr))[i] + 1 if model_presence.get("rf", True) and len(sr) == n else None
+        ranks_present = [r for r in (r_a, r_x, r_r) if r is not None]
+        if len(ranks_present) >= 2:
+            spread = max(ranks_present) - min(ranks_present)
+            threshold_high = max(2, n // 10)
+            threshold_med = max(5, n // 5)
+            if spread <= threshold_high:
+                agreement = "High"
+            elif spread <= threshold_med:
+                agreement = "Medium"
+            else:
+                agreement = "Low"
+        elif len(ranks_present) == 1:
+            agreement = "Single"
+        else:
+            agreement = "Unknown"
 
         contrib = attention_by_team.get(tid, [])
         p_rank = playoff_rank.get(tid)
@@ -167,6 +189,7 @@ def predict_teams(
         }
         analysis_dict: dict[str, Any] = {
             "actual_rank": int(act) if act is not None else None,
+            "actual_global_rank": int(act_global) if act_global is not None else None,
             "classification": classification,
             "playoff_rank": int(p_rank) if p_rank is not None else None,
             "rank_delta_playoffs": int(rank_delta_playoffs) if rank_delta_playoffs is not None else None,
@@ -178,7 +201,7 @@ def predict_teams(
             "prediction": pred_dict,
             "analysis": analysis_dict,
             "ensemble_diagnostics": {"model_agreement": agreement, "deep_set_rank": int(r_a) if r_a is not None else None, "xgboost_rank": int(r_x) if r_x is not None else None, "random_forest_rank": int(r_r) if r_r is not None else None},
-            "roster_dependence": {"primary_contributors": [{"player": str(p), "attention_weight": float(w)} for p, w in contrib]},
+            "roster_dependence": {"primary_contributors": [{"player": str(p), "attention_weight": float(w)} for p, w in contrib if np.isfinite(w)]},
         })
     return out
 
@@ -238,27 +261,37 @@ def run_inference_from_db(
     target_date = dates_sorted[-1] if dates_sorted else None
     target_lists = [lst for lst in lists if lst["as_of_date"] == target_date]
     if not target_lists:
-        target_lists = lists[-2:] if len(lists) >= 2 else lists
+        target_lists = [lists[-1]] if lists else []
     # Flatten to one list of (team_id, as_of_date) across target lists; keep unique team_id for naming/rank
     team_id_to_as_of: dict[int, str] = {}
     team_id_to_actual_rank: dict[int, int] = {}
     team_id_to_win_rate: dict[int, float] = {}
     for lst in target_lists:
-        for r, tid in enumerate(lst["team_ids"], start=1):
+        win_rates = lst.get("win_rates", [])
+        for idx, tid in enumerate(lst["team_ids"]):
             tid = int(tid)
-            team_id_to_as_of[tid] = lst["as_of_date"]
-            team_id_to_actual_rank[tid] = r
-            team_id_to_win_rate[tid] = lst["win_rates"][lst["team_ids"].index(tid)] if tid in lst["team_ids"] else 0.0
+            if tid not in team_id_to_as_of:
+                team_id_to_as_of[tid] = lst["as_of_date"]
+            if tid not in team_id_to_actual_rank:
+                team_id_to_actual_rank[tid] = idx + 1
+            if tid not in team_id_to_win_rate:
+                team_id_to_win_rate[tid] = float(win_rates[idx]) if idx < len(win_rates) else 0.0
     unique_team_ids = list(dict.fromkeys(tid for lst in target_lists for tid in lst["team_ids"]))
     unique_team_ids = [int(t) for t in unique_team_ids]
     if not unique_team_ids:
         raise ValueError("No teams in target lists.")
     team_dates = [(tid, team_id_to_as_of.get(tid, target_date or "")) for tid in unique_team_ids]
     as_of_date = target_date or team_dates[0][1]
+    win_rate_map = {tid: float(team_id_to_win_rate.get(tid, 0.0)) for tid in unique_team_ids}
+    sorted_global = sorted(win_rate_map.items(), key=lambda x: (-x[1], x[0]))
+    actual_global_rank = {tid: i + 1 for i, (tid, _) in enumerate(sorted_global)}
 
     device = torch.device("cpu")  # Match load_models map_location="cpu"
     tid_to_score_a: dict[int, float] = {}
     attention_by_team: dict[int, list[tuple[str, float]]] = {}  # team_id -> [(player_name, weight), ...]
+    team_id_to_batch: dict[int, tuple[int, int]] = {}
+    team_id_to_player_ids: dict[int, list[int | None]] = {}
+    batches_a: list[dict[str, Any]] = []
     if model_a is not None:
         batches_a, list_metas = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
         if batches_a:
@@ -271,14 +304,18 @@ def run_inference_from_db(
                     tid = int(tid)
                     tid_to_score_a[tid] = float(scores_list[i][0, k].item())
                     player_ids = meta.get("player_ids_per_team", [[]])[k] if k < len(meta.get("player_ids_per_team", [])) else []
+                    if tid not in team_id_to_batch:
+                        team_id_to_batch[tid] = (i, k)
+                        team_id_to_player_ids[tid] = [int(pid) if pid is not None else None for pid in player_ids]
                     attn_weights = attn_tensor[0, k].numpy() if attn_tensor.dim() >= 2 else attn_tensor[k].numpy()
+                    attn_weights = np.nan_to_num(attn_weights, nan=0.0, posinf=0.0, neginf=0.0)
                     order = np.argsort(-attn_weights)
                     contrib: list[tuple[str, float]] = []
                     for idx in order[:10]:
                         if idx >= len(player_ids) or player_ids[idx] is None:
                             continue
                         w = float(attn_weights[idx])
-                        if w <= 0:
+                        if not np.isfinite(w) or w <= 0:
                             continue
                         pid = player_ids[idx]
                         name = player_id_to_name.get(int(pid), f"Player_{pid}")
@@ -354,15 +391,77 @@ def run_inference_from_db(
         rf_scores=sr,
         meta_model=meta,
         actual_ranks=actual_ranks,
+        actual_global_ranks=actual_global_rank,
         attention_by_team=attention_by_team if attention_by_team else None,
         team_id_to_conference=team_id_to_conf,
         playoff_rank=playoff_rank_map if playoff_rank_map else None,
+        model_presence={"a": model_a is not None, "xgb": xgb is not None, "rf": rf is not None},
         true_strength_scale=config.get("output", {}).get("true_strength_scale", "percentile"),
         odds_temperature=float(config.get("output", {}).get("odds_temperature", 1.0)),
     )
+
+    # Integrated Gradients summary in predictions.json (optional, top-K per conference)
+    ig_by_team: dict[int, list[dict[str, Any]]] = {}
+    ig_top_k = int(config.get("output", {}).get("ig_inference_top_k", 1))
+    if ig_top_k > 0 and model_a is not None and batches_a and team_id_to_batch:
+        try:
+            from src.viz.integrated_gradients import ig_attr, _HAS_CAPTUM
+            if _HAS_CAPTUM:
+                ig_steps = int(config.get("output", {}).get("ig_inference_steps", 50))
+                for conf in ("E", "W"):
+                    conf_preds = [t for t in preds if team_id_to_conf.get(t["team_id"], "E") == conf]
+                    conf_preds = sorted(
+                        conf_preds,
+                        key=lambda t: t["prediction"].get("conference_rank") or t["prediction"]["global_rank"],
+                    )
+                    for t in conf_preds[:ig_top_k]:
+                        tid = int(t["team_id"])
+                        if tid not in team_id_to_batch:
+                            continue
+                        b_idx, k = team_id_to_batch[tid]
+                        if b_idx >= len(batches_a):
+                            continue
+                        batch = batches_a[b_idx]
+                        emb = batch["embedding_indices"][:, k, :]
+                        stats = batch["player_stats"][:, k, :, :]
+                        minu = batch["minutes"][:, k, :]
+                        msk = batch["key_padding_mask"][:, k, :]
+                        attr, _ = ig_attr(model_a, emb, stats, minu, msk, n_steps=ig_steps)
+                        if attr is None or attr.numel() == 0:
+                            continue
+                        norms = torch.norm(attr[0].float(), dim=1)
+                        if norms.numel() == 0:
+                            continue
+                        topk = min(5, norms.shape[0])
+                        vals, idxs = norms.topk(topk, largest=True)
+                        player_ids = team_id_to_player_ids.get(tid, [])
+                        contrib: list[dict[str, Any]] = []
+                        for v, idx in zip(vals.tolist(), idxs.tolist()):
+                            if idx >= len(player_ids) or player_ids[idx] is None:
+                                continue
+                            if not np.isfinite(v):
+                                continue
+                            pid = player_ids[idx]
+                            name = player_id_to_name.get(int(pid), f"Player_{pid}")
+                            contrib.append({"player": name, "attribution_norm": float(v)})
+                        if contrib:
+                            ig_by_team[tid] = contrib
+            else:
+                print("Integrated Gradients skipped (captum not installed).", file=sys.stderr)
+        except Exception as e:
+            print(f"Integrated Gradients inference failed: {e}", file=sys.stderr)
+
+    if ig_by_team:
+        for t in preds:
+            tid = int(t["team_id"])
+            if tid in ig_by_team:
+                rd = t.get("roster_dependence") or {}
+                rd["ig_contributors"] = ig_by_team[tid]
+                t["roster_dependence"] = rd
+
     pj = out / "predictions.json"
     with open(pj, "w", encoding="utf-8") as f:
-        json.dump({"teams": preds}, f, indent=2)
+        json.dump({"teams": preds}, f, indent=2, allow_nan=False)
 
     east_preds = [t for t in preds if team_id_to_conf.get(t["team_id"], "E") == "E"]
     west_preds = [t for t in preds if team_id_to_conf.get(t["team_id"], "W") == "W"]
@@ -377,11 +476,21 @@ def run_inference_from_db(
             ax.set_ylabel("Predicted conference rank")
             ax.grid(True, linestyle="--", alpha=0.7)
             return
-        pr = [t["prediction"].get("conference_rank") or t["prediction"]["predicted_rank"] for t in pred_list]
-        ar = [t["analysis"]["actual_rank"] for t in pred_list]
-        pr = [p if p is not None else 0 for p in pr]
-        ar = [a if a is not None else 0 for a in ar]
-        names = [t["team_name"] for t in pred_list]
+        points = []
+        for t in pred_list:
+            pr = t["prediction"].get("conference_rank")
+            ar = t["analysis"].get("actual_rank")
+            if pr is None or ar is None:
+                continue
+            points.append((ar, pr, t["team_name"]))
+        if not points:
+            ax.text(0.5, 0.5, f"No valid {title} ranks", ha="center", va="center", transform=ax.transAxes)
+            ax.set_title(title)
+            ax.set_xlabel("Actual conference rank")
+            ax.set_ylabel("Predicted conference rank")
+            ax.grid(True, linestyle="--", alpha=0.7)
+            return
+        ar, pr, names = zip(*points)
         max_r = max(max(ar or [1]), max(pr or [1]), 1) + 1
         ax.plot([0, max_r], [0, max_r], "k--", alpha=0.5, label="identity")
         cmap = plt.get_cmap("tab20")

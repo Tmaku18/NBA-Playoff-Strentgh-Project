@@ -20,21 +20,72 @@ def get_roster_as_of_date(
     team_id_col: str = "team_id",
     min_col: str = "min",
     n: int = 15,
+    season_start: str | pd.Timestamp | None = None,
+    latest_team_map: dict[int, int] | None = None,
 ) -> pd.DataFrame:
     """
-    For one team and as_of_date, select rows with game_date < as_of_date, sum minutes per player,
-    take top-N by minutes, return a DataFrame with player_id, total_min, rank.
+    For one team and as_of_date, select rows with game_date < as_of_date (optionally season-scoped),
+    keep only players whose latest team matches team_id, sum minutes per player, take top-N by minutes,
+    return a DataFrame with player_id, total_min, rank.
     """
     ad = pd.to_datetime(as_of_date).date() if isinstance(as_of_date, str) else as_of_date
-    mask = (pgl[team_id_col] == team_id) & (pd.to_datetime(pgl[date_col]).dt.date < ad)
+    dates = pd.to_datetime(pgl[date_col]).dt.date
+    mask = (pgl[team_id_col] == team_id) & (dates < ad)
+    if season_start is not None:
+        ss = pd.to_datetime(season_start).date() if isinstance(season_start, str) else season_start
+        mask &= dates >= ss
     past = pgl.loc[mask]
     if past.empty:
         return pd.DataFrame(columns=[player_id_col, "total_min", "rank"])
+
+    if latest_team_map is None:
+        latest_team_map = latest_team_map_as_of(
+            pgl,
+            as_of_date,
+            date_col=date_col,
+            player_id_col=player_id_col,
+            team_id_col=team_id_col,
+            season_start=season_start,
+        )
+    if latest_team_map:
+        latest_team = past[player_id_col].map(latest_team_map)
+        past = past.loc[latest_team == team_id]
+        if past.empty:
+            return pd.DataFrame(columns=[player_id_col, "total_min", "rank"])
 
     tot = past.groupby(player_id_col, as_index=False)[min_col].sum()
     tot = tot[tot[min_col] > 0].nlargest(n, min_col).reset_index(drop=True)
     tot["rank"] = range(len(tot))
     return tot.rename(columns={player_id_col: "player_id", min_col: "total_min"})
+
+
+def latest_team_map_as_of(
+    pgl: pd.DataFrame,
+    as_of_date: str | pd.Timestamp,
+    *,
+    date_col: str = "game_date",
+    player_id_col: str = "player_id",
+    team_id_col: str = "team_id",
+    season_start: str | pd.Timestamp | None = None,
+) -> dict[int, int]:
+    """Return player_id -> latest team_id as of date (optionally season-scoped)."""
+    ad = pd.to_datetime(as_of_date).date() if isinstance(as_of_date, str) else as_of_date
+    dates = pd.to_datetime(pgl[date_col]).dt.date
+    mask = dates < ad
+    if season_start is not None:
+        ss = pd.to_datetime(season_start).date() if isinstance(season_start, str) else season_start
+        mask &= dates >= ss
+    past = pgl.loc[mask, [player_id_col, team_id_col, date_col]]
+    if past.empty:
+        return {}
+    past = past.copy()
+    past[date_col] = pd.to_datetime(past[date_col])
+    past = past.sort_values(date_col)
+    latest = past.drop_duplicates(subset=[player_id_col], keep="last")
+    return {
+        int(pid): int(tid)
+        for pid, tid in zip(latest[player_id_col].tolist(), latest[team_id_col].tolist())
+    }
 
 
 def build_roster_set(

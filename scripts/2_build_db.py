@@ -48,7 +48,10 @@ def main():
             manifest["raw"][p.name] = hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (raw_dir).glob("*.csv"):
             manifest["raw"][p.name] = hashlib.sha256(p.read_bytes()).hexdigest()
-    manifest["db_path"] = str(db_path)
+    try:
+        manifest["db_path"] = str(db_path.relative_to(ROOT))
+    except ValueError:
+        manifest["db_path"] = str(db_path)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)

@@ -80,13 +80,17 @@ def compute_playoff_performance_rank(
     if not all_team_ids:
         return {}
 
-    # Teams with at least one playoff win: sort by (playoff_wins desc, reg_win_pct desc)
-    playoff_teams = [tid for tid in all_team_ids if pw.get(tid, 0) > 0]
-    playoff_teams.sort(key=lambda t: (-pw.get(t, 0), -reg_wp.get(t, 0.0)))
+    def _safe_wp(tid: int) -> float:
+        v = reg_wp.get(tid, 0.0)
+        return float(v) if pd.notna(v) else 0.0
 
-    # Lottery teams (0 playoff wins): sort by reg_win_pct desc
+    # Teams with at least one playoff win: sort by (playoff_wins desc, reg_win_pct desc, team_id asc)
+    playoff_teams = [tid for tid in all_team_ids if pw.get(tid, 0) > 0]
+    playoff_teams.sort(key=lambda t: (-pw.get(t, 0), -_safe_wp(t), t))
+
+    # Lottery teams (0 playoff wins): sort by reg_win_pct desc, team_id asc
     lottery = [tid for tid in all_team_ids if pw.get(tid, 0) == 0]
-    lottery.sort(key=lambda t: -reg_wp.get(t, 0.0))
+    lottery.sort(key=lambda t: (-_safe_wp(t), t))
 
     playoff_top = playoff_teams[:16]
     lottery_top = lottery[:14]

@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 import torch
 
-from src.features.build_roster_set import build_roster_set, get_roster_as_of_date
+from src.features.build_roster_set import build_roster_set, get_roster_as_of_date, latest_team_map_as_of
 from src.features.rolling import PLAYER_STAT_COLS_L10, get_player_stats_as_of_date
 from src.training.build_lists import build_lists
 
@@ -36,18 +36,27 @@ def build_batches_from_lists(
     list_metas: list[dict[str, Any]] = []
     for lst in lists:
         as_of_date = lst["as_of_date"]
+        season_start = _season_start_for_date(config, as_of_date)
         team_ids = lst["team_ids"]
         win_rates = lst["win_rates"]
         if len(team_ids) < 2:
             continue
         player_stats_df = get_player_stats_as_of_date(pgl, as_of_date, stat_cols=PLAYER_STAT_COLS_L10)
+        latest_team_map = latest_team_map_as_of(pgl, as_of_date, season_start=season_start)
         embs_list = []
         stats_list = []
         min_list = []
         mask_list = []
         player_ids_per_team: list[list[int | None]] = []
         for tid in team_ids:
-            roster = get_roster_as_of_date(pgl, int(tid), as_of_date, n=roster_size)
+            roster = get_roster_as_of_date(
+                pgl,
+                int(tid),
+                as_of_date,
+                n=roster_size,
+                season_start=season_start,
+                latest_team_map=latest_team_map,
+            )
             order = roster.sort_values("rank")["player_id"].tolist() if not roster.empty else []
             pad = roster_size - len(order)
             if pad < 0:
@@ -112,17 +121,26 @@ def build_batches_from_db(
     batches: list[dict[str, Any]] = []
     for lst in lists:
         as_of_date = lst["as_of_date"]
+        season_start = _season_start_for_date(config, as_of_date)
         team_ids = lst["team_ids"]
         win_rates = lst["win_rates"]
         if len(team_ids) < 2:
             continue
         player_stats_df = get_player_stats_as_of_date(pgl, as_of_date, stat_cols=PLAYER_STAT_COLS_L10)
+        latest_team_map = latest_team_map_as_of(pgl, as_of_date, season_start=season_start)
         embs_list: list[list[int]] = []
         stats_list: list[list[list[float]]] = []
         min_list: list[list[float]] = []
         mask_list: list[list[bool]] = []
         for tid in team_ids:
-            roster = get_roster_as_of_date(pgl, int(tid), as_of_date, n=roster_size)
+            roster = get_roster_as_of_date(
+                pgl,
+                int(tid),
+                as_of_date,
+                n=roster_size,
+                season_start=season_start,
+                latest_team_map=latest_team_map,
+            )
             emb, rows, minutes, mask = build_roster_set(
                 roster,
                 player_stats_df,
@@ -148,3 +166,16 @@ def build_batches_from_db(
             "rel": rel,
         })
     return batches
+
+
+def _season_start_for_date(config: dict, as_of_date: str) -> str | None:
+    seasons_cfg = config.get("seasons") or {}
+    if not seasons_cfg:
+        return None
+    d = pd.to_datetime(as_of_date).date()
+    for season, rng in seasons_cfg.items():
+        start = pd.to_datetime(rng.get("start")).date()
+        end = pd.to_datetime(rng.get("end")).date()
+        if start <= d <= end:
+            return str(start)
+    return None

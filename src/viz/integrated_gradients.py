@@ -33,7 +33,29 @@ def ig_attr(
         raise ImportError("captum is required")
 
     def fn(stats: torch.Tensor) -> torch.Tensor:
-        o, _, _ = model(emb_indices, stats, minutes, key_padding_mask)
+        # Captum may batch the primary input (stats); expand other inputs to match.
+        if stats.dim() == 4:
+            # stats: (steps, batch, P, S) -> flatten to (steps*batch, P, S)
+            steps, batch, P, S = stats.shape
+            stats_ = stats.reshape(steps * batch, P, S)
+            emb = emb_indices
+            minu = minutes
+            mask = key_padding_mask
+            if emb.shape[0] == batch:
+                emb = emb.unsqueeze(0).expand(steps, batch, -1).reshape(steps * batch, -1)
+                minu = minu.unsqueeze(0).expand(steps, batch, -1).reshape(steps * batch, -1)
+                mask = mask.unsqueeze(0).expand(steps, batch, -1).reshape(steps * batch, -1)
+            else:
+                emb = emb.expand(steps * batch, -1)
+                minu = minu.expand(steps * batch, -1)
+                mask = mask.expand(steps * batch, -1)
+            o, _, _ = model(emb, stats_, minu, mask)
+        else:
+            B = stats.shape[0]
+            emb = emb_indices if emb_indices.shape[0] == B else emb_indices.expand(B, -1)
+            minu = minutes if minutes.shape[0] == B else minutes.expand(B, -1)
+            mask = key_padding_mask if key_padding_mask.shape[0] == B else key_padding_mask.expand(B, -1)
+            o, _, _ = model(emb, stats, minu, mask)
         return o if target is None else o[..., target]
 
     ig = IntegratedGradients(fn)

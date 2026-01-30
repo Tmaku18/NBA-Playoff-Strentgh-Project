@@ -55,7 +55,10 @@ def main():
     pred_scores = []
     pred_ranks = []
     for t in teams:
-        act = t.get("analysis", {}).get("actual_rank")
+        analysis = t.get("analysis", {})
+        act = analysis.get("actual_global_rank")
+        if act is None:
+            act = analysis.get("actual_rank")
         pred_rank = t.get("prediction", {}).get("predicted_rank")
         tss = t.get("prediction", {}).get("true_strength_score")
         if act is not None:
@@ -83,7 +86,7 @@ def main():
     else:
         m["roc_auc_upset"] = 0.5
     m["notes"] = {
-        "upset_definition": "sleeper = actual_rank > predicted_rank (under-ranked by standings)",
+        "upset_definition": "sleeper = actual_global_rank > predicted_rank (fallback to actual_rank when missing)",
         "mrr": "top_k=2; 1/rank of first max-relevance item in predicted order (two conferences).",
     }
 

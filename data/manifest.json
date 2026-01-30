@@ -49,5 +49,5 @@
     "download": "1769747778.081988"
   },
   "processed": "6c59726c22df7f90696c2a26412709a62e9b248e2011d6d04197dbdc5f7c6953",
-  "db_path": "C:\\Users\\tmaku\\OneDrive\\Documents\\GSU\\Advanced Machine Learning\\NBA Playoff Strentgh Project\\data\\processed\\nba_build_run.duckdb"
+  "db_path": "data\\processed\\nba_build_run.duckdb"
 }
