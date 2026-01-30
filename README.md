@@ -130,11 +130,11 @@ Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batch
 
 ## Full Plan
 
-See `.cursor/plans/Plan.md`. Planned extensions: [.cursor/plans/Update1.md](.cursor/plans/Update1.md), [.cursor/plans/Update2.md](.cursor/plans/Update2.md).
+See `.cursor/plans/Plan.md`. Planned extensions: [.cursor/plans/Update1.md](.cursor/plans/Update1.md), [.cursor/plans/Update2.md](.cursor/plans/Update2.md), [.cursor/plans/Update3.md](.cursor/plans/Update3.md), [.cursor/plans/Update4.md](.cursor/plans/Update4.md), [.cursor/plans/Update5.md](.cursor/plans/Update5.md).
 
 ---
 
 ## Implementation Roadmap
 The full phased development plan and file-by-file checklist are in
 `.cursor/plans/Plan.md` under **Development and Implementation Plan**.
-Update1 roadmap: `.cursor/plans/Update1.md`. Update2 roadmap: `.cursor/plans/Update2.md`.
+Update1 roadmap: `.cursor/plans/Update1.md`. Update2 roadmap: `.cursor/plans/Update2.md`. Update3 roadmap: `.cursor/plans/Update3.md`. Update4 roadmap: `.cursor/plans/Update4.md`. Update5 roadmap: `.cursor/plans/Update5.md`.
