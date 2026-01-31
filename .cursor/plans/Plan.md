@@ -19,25 +19,6 @@ Traditional sports prediction models often rely on simple team-level season aver
 
 ---
 
-## Roadmap (Authoritative)
-
-This is the top-level execution roadmap for the project. It is the authoritative plan to implement, and it supersedes any alternate planning docs (e.g., `Opus_Plan.md`) which should be treated as optional implementation references only.
-
-1. **Phase 0** - Requirements lock and acceptance criteria  
-2. **Phase 1** - Data layer and storage (DuckDB, ingestion, manifest)  
-3. **Phase 2** - Feature engineering and leakage controls (t-1, DNP, roster)  
-4. **Phase 3** - Model A (Deep Set) + stable ListMLE  
-5. **Phase 4** - Model B (XGBoost + RF, no net_rating)  
-6. **Phase 5** - OOF stacking meta-learner (RidgeCV on pooled OOF)  
-7. **Phase 6** - Evaluation + baselines (NDCG/Spearman/MRR, Brier, ROC-AUC)  
-8. **Phase 7** - Explainability + attention validation  
-9. **Phase 8** - Visualization suite + reporting  
-10. **Phase 9** - Integration and reproducibility controls  
-
-Details for each phase and file-level tasks are defined in **Section 9** and **Section 10**.
-
----
-
 ## 2. Data Strategy and Scope
 
 ### 2.1 Historical Constraints: The "Modern Era"

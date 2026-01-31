@@ -1,29 +1,67 @@
 # Model Performance Over Runs and Implications for Hyperparameters / Reverts
 
-This document summarizes how pipeline performance evolved across runs (from `.cursor/plans/` and `outputs/ANALYSIS.md`), what that implies about optimal hyperparameters, and which code or config might need reverting or re-checking.
+This document summarizes how pipeline performance evolved across runs (from `outputs/` and `.cursor/plans/`), what that implies about optimal hyperparameters, and which code or config might need reverting or re-checking.
 
 ---
 
 ## 1. Performance trajectory across runs
 
-| Run / period | Documented metrics | Main causes (from plans) |
-|--------------|--------------------|---------------------------|
-| **run_008** | Not reported numerically; plans cite **NaN attention**, **rank scale mismatch** (conference 1–15 vs global 1–30), IG batching failure. | Evaluation mixed 1–15 and 1–30; `actual_rank` overwritten across lists; conference plot fallback used global rank on 1–15 axes; NaN in JSON. |
-| **run_009** | **ndcg ~0.00026**, **spearman 0.0**, **mrr 0.0**, **roc_auc_upset 0.5**. Playoff: spearman -0.18, ndcg_at_4 0.36, brier ~0.001. | Model A trained **3 epochs** with **flat loss 27.8993**; evaluation still tied to run_009 when run_010 was created (5_evaluate runs before 6). Possible EOS/rank alignment bugs. |
-| **run_010** | No eval numbers in plans; **playoff_rank** all 17–30 (16 null, 14 non-null in 17–30); **attention weights 0.0** everywhere. | Same 3-epoch Model A; **playoff season mapping** bug (`"2024"` vs `"2023-24"`) → empty filters → lottery-only ranks; attention diluted by **query including padded positions** (Update3/next_steps). |
-| **Current** (eval_report.json) | **ndcg 0.64**, **spearman 0.72**, **mrr 0.0**, **roc_auc_upset 0.63**. No playoff_metrics in report. | Eval uses **EOS_global_rank** and **predicted_strength** (fix_run_009 renames); **Model A epochs** increased (config has **epochs: 20**, early stopping). Likely run_011–013 or later. |
+### 1.1 Computed metrics per run (from `outputs/*/predictions.json`)
 
-**Summary:** Performance improved sharply after (1) **evaluation fix** (EOS_global_rank, correct scale, field renames), (2) **more Model A training** (3 → 20 epochs). Run_008/009/010 suffered from both evaluation bugs and under-training; current metrics reflect fixed eval and longer training.
+| Run | NDCG@10 | Spearman | MRR (top‑2) | ROC‑AUC upset | Schema | Attention |
+|-----|---------|----------|-------------|---------------|--------|-----------|
+| run_001 | 0.7854 | 0.7425 | 0.50 | 0.8519 | Old (`predicted_rank`, `true_strength_score`, `actual_rank`) | empty |
+| run_002 | 0.7854 | 0.7425 | 0.50 | 0.8519 | Old | empty |
+| run_003 | 0.7854 | 0.7425 | 0.50 | 0.8519 | Old | empty |
+| run_008 | 0.8063 | 0.7211 | 0.50 | 0.8393 | Old | NaN |
+| run_009 | 0.6378 | 0.7175 | 0.00 | 0.6295 | New (`predicted_strength`, `ensemble_score`, `EOS_global_rank`) | empty |
+| run_010 | 0.6378 | 0.7175 | 0.00 | 0.6295 | New | 0.0 |
+| run_011 | 0.6378 | 0.7175 | 0.00 | 0.6295 | New | empty |
+| run_012 | 0.6378 | 0.7175 | 0.00 | 0.6295 | New | empty |
+| run_013 | 0.6378 | 0.7175 | 0.00 | 0.6295 | New | empty |
+
+*Note: run_004–007 have no `predictions.json`. Metrics computed with unified eval logic (same as `scripts/5_evaluate.py` with schema fallbacks for old runs).*
+
+### 1.2 Inferences from the trajectory
+
+1. **Schema change (run_009)**  
+   Run_001–008 use the old schema (`actual_rank`, `predicted_rank`, `true_strength_score`). Run_009 onward use the new schema (`EOS_global_rank`, `predicted_strength`, `ensemble_score`). The higher NDCG/ROC in run_001–008 likely reflect **scale mismatch** (e.g. conference 1–15 vs global 1–30) or different relevance assumptions, not genuinely better models. Plans cite mixed 1–15/1–30 evaluation for run_008.
+
+2. **Post-fix performance (run_009–013)**  
+   With consistent `EOS_global_rank`-based eval, **ndcg ≈ 0.64**, **spearman ≈ 0.72**, **roc_auc_upset ≈ 0.63** across run_009–013. These runs share **identical predictions**, implying the same checkpoint (Model A + Model B + stacking) is being used. This is the current best **honest** performance.
+
+3. **Attention status**  
+   In no run did the attention mechanism produce non-zero weights: run_008 has NaN, run_010 has 0.0, others have empty `primary_contributors` or fallback only. ANALYSIS.md and IG attributions (L2 norm 0) confirm Model A attention is not learning.
+
+4. **Hyperparameter timeline (from plans)**  
+   - run_009/010: Model A trained **3 epochs** → flat loss, no learning.  
+   - run_011–013: Config has **epochs: 20**; eval fixes in place.  
+   There is no per-run hyperparameter record in `outputs/`; sweep outputs have not been written yet (Update6 pending).
 
 ---
 
-## 2. What the plans say about optimal hyperparameters
+## 2. Best-performing configs (from `outputs/`)
+
+**No sweep outputs exist yet.** `outputs/` contains only full-pipeline runs (run_001–013), and no per-run hyperparameter snapshots are saved. Therefore:
+
+| Source | Best NDCG | Best Spearman | Best ROC‑AUC | Notes |
+|--------|-----------|---------------|--------------|-------|
+| **Post-schema runs (run_009–013)** | 0.64 | 0.72 | 0.63 | Honest metrics; all five runs identical (same checkpoint). |
+| **Old-schema runs (run_001–008)** | 0.81 | 0.74 | 0.85 | Likely inflated by scale mismatch; do not compare directly. |
+
+**Conclusion:** The best **comparable** performance from outputs is **ndcg 0.64, spearman 0.72, roc_auc 0.63** (run_009–013). Achieved with current `defaults.yaml` (Model A `epochs: 20`, XGB 500/6/0.05, RF 200/12/5). No sweep has been run to empirically select better hyperparameters.
+
+---
+
+## 3. What the plans say about optimal hyperparameters
+
+*Plan-based recommendations; sweeps (Update6) have not been run yet.*
 
 ### Model A (Deep Set)
 
 - **Epochs**
   - **run_009/010:** 3 epochs → flat loss, no learning (Update3, next_steps, ANALYSIS.md).
-  - **Sweeps (Update4–6):** Epoch grids 5,10,15,20,25 then 15,20,25,30,35,40 then **8–28 step 1** with **val_frac=0.25**.
+  - **Sweeps (Update4–6, not yet run):** Epoch grids 5,10,15,20,25 then 15,20,25,30,35,40 then **8–28 step 1** with **val_frac=0.25**.
   - **Recommended (next_full_pipeline_run):**
     - **NDCG-first:** `epochs=28`, `early_stopping_patience=0` so training reaches 28 (early stopping is val-loss-based, not NDCG).
     - **Spearman-first:** `epochs≈15`.
@@ -34,11 +72,12 @@ This document summarizes how pipeline performance evolved across runs (from `.cu
 
 ### Model B (XGB + RF)
 
-- **Sweep recommendations (next_full_pipeline_run, refined_sweep_rerun):**
-  - **Ranking-first (best spearman_mean):** XGB `max_depth=4`, `learning_rate=0.08`, `n_estimators=250`; RF `n_estimators=200`, `max_depth=12`, `min_samples_leaf=5`.
-  - **RMSE-first:** XGB `max_depth=4`, `lr=0.10`, `n_estimators=300`; RF 150/12/4.
+- **Sweep recommendations (Update6, refined_sweep_rerun — not yet run):**
+  - **Phase 1 (XGB local):** `max_depth=4`; `learning_rate` {0.08, 0.10, 0.12}; `n_estimators` {250, 300, 350}; subsample/colsample 0.8.
+  - **Phase 2 (RF local):** RF `n_estimators` {150, 200, 250}; `min_samples_leaf` {4, 5, 6}; `max_depth=12`.
+  - **Ranking-first (prior plans):** XGB 4/0.08/250; RF 200/12/5. **RMSE-first:** XGB 4/0.10/300; RF 150/12/4.
 - **Current config:** XGB `n_estimators=500`, `max_depth=6`, `learning_rate=0.05`; RF 200/12/5.
-- So current config is **different** from the sweep “ranking-first” choice (deeper XGB, more trees, lower LR). The good current eval (Spearman 0.72) could be from Model A + stacking rather than Model B tuning; trying sweep-style Model B (e.g. 4/0.08/250) is still recommended for comparability.
+- Current config **differs** from sweep “ranking-first” choice (deeper XGB, more trees, lower LR). Spearman 0.72 may be driven by Model A + stacking; aligning Model B to sweep (e.g. 4/0.08/250) is recommended once sweeps run.
 
 ### Validation split
 
@@ -46,7 +85,7 @@ This document summarizes how pipeline performance evolved across runs (from `.cu
 
 ---
 
-## 3. Code or config that might need reverting or re-checking
+## 4. Code or config that might need reverting or re-checking
 
 Plans do **not** ask to revert any change by name; they do call out regressions and fragile behavior:
 
@@ -80,13 +119,13 @@ Plans do **not** ask to revert any change by name; they do call out regressions 
 
 ---
 
-## 4. Summary table
+## 5. Summary table
 
 | Topic | Recommendation |
 |-------|----------------|
-| **Performance trend** | run_008/009/010: broken eval and/or 3 epochs → bad metrics. Current: fixed eval + 20 epochs → ndcg 0.64, spearman 0.72, roc_auc_upset 0.63. |
+| **Performance trend** | run_001–008: old schema, inflated ndcg/roc. run_009–013: new schema, honest ndcg 0.64, spearman 0.72, roc_auc 0.63 (identical predictions). |
 | **Optimal Model A epochs** | NDCG-first: 28 (patience=0). Spearman-first: ~15. Current 20 is in between. |
-| **Optimal Model B** | From sweeps: XGB 4/0.08/250, RF 200/12/5 (ranking-first). Current config differs; consider aligning. |
+| **Optimal Model B** | From plans (sweeps not yet run): XGB 4/0.08/250, RF 200/12/5 (ranking-first). Current config differs; consider aligning once sweeps run. |
 | **Validation fraction** | Sweeps use 0.25; config has 0.1. Prefer 0.25 for epoch/sweep comparability. |
 | **Do not revert** | EOS_global_rank in eval, field renames, NaN sanitization, configurable/increased epochs. |
 | **Re-check** | Roster latest-team (contamination); playoff date-range filtering; conference plot 1–15 only; Model B hparams vs sweep. |
