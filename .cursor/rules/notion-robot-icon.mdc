@@ -1,0 +1,18 @@
+---
+description: Ensure Notion items created/updated for this project use 🤖 icon
+alwaysApply: true
+---
+
+# Notion icon convention (project-wide)
+
+Any time you create **or** update anything in Notion that is related to this project (pages, databases, tasks, documents, run logs, plans, file trackers), set the Notion **page icon** to the **🤖** emoji so it is easily recognizable.
+
+## How to apply
+
+- When creating a Notion page/database entry: set its icon to **🤖** at creation time.
+- When updating an existing Notion item for this project: if its icon is not **🤖**, change it to **🤖** as part of the same update.
+
+## Notes
+
+- Apply this consistently across all Notion workstreams for this repo (planning, tracking, outputs, documentation, experiments).
+- If the Notion integration/tooling you’re using cannot set icons, proceed with the content change but note that the icon could not be set.

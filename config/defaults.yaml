@@ -1,0 +1,71 @@
+# NBA True Strength — runtime config
+# Source of truth: .cursor/plans/Plan.md
+
+# Season boundaries (hard-coded to avoid play-in ambiguity)
+seasons:
+  "2015-16": { start: "2015-10-01", end: "2016-04-15" }
+  "2016-17": { start: "2016-10-01", end: "2017-04-15" }
+  "2017-18": { start: "2017-10-01", end: "2018-04-15" }
+  "2018-19": { start: "2018-10-01", end: "2019-04-15" }
+  "2019-20": { start: "2019-10-01", end: "2020-04-15" }
+  "2020-21": { start: "2020-12-01", end: "2021-05-15" }
+  "2021-22": { start: "2021-10-01", end: "2022-04-15" }
+  "2022-23": { start: "2022-10-01", end: "2023-04-15" }
+  "2023-24": { start: "2023-10-01", end: "2024-04-15" }
+  "2024-25": { start: "2024-10-01", end: "2025-04-15" }
+  "2025-26": { start: "2025-10-01", end: "2026-04-15" }
+
+paths:
+  db: "data/processed/nba_build_run.duckdb"
+  raw: "data/raw"
+  processed: "data/processed"
+  outputs: "outputs"
+
+# Skip rebuilding DB if file already exists (saves existing DB; set false to force rebuild from raw)
+build_db:
+  skip_if_exists: true
+
+repro:
+  seed: 42
+
+model_a:
+  num_embeddings: 500
+  embedding_dim: 32
+  encoder_hidden: [128, 64]
+  attention_heads: 4
+  dropout: 0.2
+  epochs: 20
+  early_stopping_patience: 3
+  early_stopping_min_delta: 0.0
+  early_stopping_val_frac: 0.1
+
+model_b:
+  xgb:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+    early_stopping_rounds: 20
+  rf:
+    n_estimators: 200
+    max_depth: 12
+    min_samples_leaf: 5
+
+training:
+  n_folds: 5
+  rolling_windows: [10, 30]
+  roster_size: 15
+  target_rank: "standings"  # or "playoffs" to train meta on playoff performance rank
+  # Model A (script 3): subsample lists for feasible runtime
+  max_lists_oof: 30        # max lists for OOF; subsampled when there are more
+  max_final_batches: 50    # max lists for final Model A training (script 3)
+  # build_lists (src/training/build_lists.py) subsamples dates to 200 when there are more
+
+output:
+  true_strength_scale: "percentile"  # or softmax, platt
+  odds_temperature: 1.0  # softmax temperature for championship odds
+  ig_inference_top_k: 1  # per conference; set 0 to disable IG in predictions.json
+  ig_inference_steps: 50
+
+# null = auto-increment run (run_002, run_003, ... from existing run_* dirs); set e.g. "run_001" to fix
+inference:
+  run_id: null

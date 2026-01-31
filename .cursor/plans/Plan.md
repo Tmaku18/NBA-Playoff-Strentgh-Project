@@ -19,6 +19,25 @@ Traditional sports prediction models often rely on simple team-level season aver
 
 ---
 
+## Roadmap (Authoritative)
+
+This is the top-level execution roadmap for the project. It is the authoritative plan to implement, and it supersedes any alternate planning docs (e.g., `Opus_Plan.md`) which should be treated as optional implementation references only.
+
+1. **Phase 0** - Requirements lock and acceptance criteria  
+2. **Phase 1** - Data layer and storage (DuckDB, ingestion, manifest)  
+3. **Phase 2** - Feature engineering and leakage controls (t-1, DNP, roster)  
+4. **Phase 3** - Model A (Deep Set) + stable ListMLE  
+5. **Phase 4** - Model B (XGBoost + RF, no net_rating)  
+6. **Phase 5** - OOF stacking meta-learner (RidgeCV on pooled OOF)  
+7. **Phase 6** - Evaluation + baselines (NDCG/Spearman/MRR, Brier, ROC-AUC)  
+8. **Phase 7** - Explainability + attention validation  
+9. **Phase 8** - Visualization suite + reporting  
+10. **Phase 9** - Integration and reproducibility controls  
+
+Details for each phase and file-level tasks are defined in **Section 9** and **Section 10**.
+
+---
+
 ## 2. Data Strategy and Scope
 
 ### 2.1 Historical Constraints: The "Modern Era"
@@ -161,3 +180,123 @@ No MAE on Net Rating; no efficiency alignment metric in evaluation. Net Rating i
 - **OOF:** Persist OOF predictions (`outputs/oof_*.parquet`) for stacking analysis.
 - **Data versioning:** Store hashes of raw + processed datasets.
 - **Season boundaries:** In `defaults.yaml` (or equivalent config), **hard-code** season date ranges, e.g. `{season: {start: "YYYY-10-01", end: "YYYY-04-15"}}`, to avoid inferring "end of regular season" from logs (which can blur play-in vs. regular season).
+
+---
+
+## 9. Development and Implementation Plan
+
+### Phase 0 - Requirements Lock and Acceptance Criteria
+1. Freeze target definition (future W/L or final seed only).
+2. Confirm no Net Rating as input or evaluation metric.
+3. Finalize evaluation metrics and baselines.
+4. Define True Strength score mapping (percentile default).
+5. Validate data source policy (Kaggle primary, BRef fallback, Proxy SOS).
+
+**Exit criteria:** Finalized Plan.md + README scope; updated metrics list; season calendar confirmed.
+
+### Phase 1 - Data Layer and Storage
+1. Define DB schema (games, player logs, team logs, standings, context).
+2. Implement `nba_api` ingesters and Kaggle loader.
+3. Implement Proxy SOS fallback (opponent win-rate or SRS-derived).
+4. Choose DuckDB vs SQLite; add indexes if SQLite.
+5. Add data manifest hashing for reproducibility.
+
+**Deliverables:** `src/data/` loaders, schema, manifest builder.
+
+### Phase 2 - Feature Engineering and Leakage Controls
+1. Rolling windows with strict `t-1` (`shift(1)` before roll).
+2. DNP handling: per-game averages + availability fraction.
+3. Roster selection as-of date only; top-N by minutes.
+4. Embeddings: hash-trick index for unseen players.
+5. Build game-level lists by conference-date/week.
+
+**Deliverables:** `src/features/rolling.py`, `src/data/build_roster_set.py`.
+
+### Phase 3 - Model A (Deep Set)
+1. Player encoder (shared MLP).
+2. Minutes-weighted attention with padding mask.
+3. ListMLE loss with `torch.logsumexp` stability.
+4. Z extraction and prediction head.
+5. DataLoader with custom collate_fn for variable-length rosters.
+
+**Deliverables:** `src/models/player_encoder.py`, `set_attention.py`, `deep_set_rank.py`, `listmle_loss.py`.
+
+### Phase 4 - Model B (Hybrid Tabular)
+1. Build team-level features (Four Factors, SOS/SRS, pace).
+2. Train XGBoost and Random Forest models.
+3. Validate no Net Rating in feature set.
+
+**Deliverables:** `src/models/xgboost_ensemble.py`, `rf_ensemble.py`, `features/team_context.py`.
+
+### Phase 5 - OOF Stacking Meta-Learner
+1. Generate OOF predictions across all training seasons.
+2. Train RidgeCV on pooled OOF predictions.
+3. Persist OOF outputs to `outputs/oof_*.parquet`.
+
+**Deliverables:** `src/models/stacking.py`, `src/training/train_stacking.py`.
+
+### Phase 6 - Evaluation and Baselines
+1. Implement NDCG, Spearman, MRR.
+2. Implement Brier score on future outcomes.
+3. Implement ROC-AUC for Upset detection.
+4. Baselines: rank-by-SRS, rank-by-Net-Rating, Dummy baseline.
+
+**Deliverables:** `src/evaluation/metrics.py`, `src/evaluation/evaluate.py`.
+
+### Phase 7 - Explainability and Validation
+1. SHAP on Model B only.
+2. Integrated Gradients or permutation ablation for Model A.
+3. Attention validation via high-attention vs random masking.
+
+**Deliverables:** `src/viz/shap_heatmap.py`, `src/viz/attention_roster.py`, ablation script.
+
+### Phase 8 - Visualization Suite
+1. Predicted vs Actual Rank scatter.
+2. Fraud/Sleeper index bar chart.
+3. SHAP summary (Model B).
+4. Roster attention distribution.
+5. Sleeper Timeline (score vs rank over season).
+
+**Deliverables:** `src/viz/accuracy_plot.py`, `fraud_sleeper.py`, `sleeper_timeline.py`.
+
+### Phase 9 - Integration and Reproducibility
+1. End-to-end scripts (download -> build -> train -> evaluate -> inference).
+2. Seed control in all scripts; deterministic DataLoader workers.
+3. Data manifest versioning and run logs.
+
+**Deliverables:** `scripts/1_download_raw.py` through `scripts/6_run_inference.py`.
+
+---
+
+## 10. File-by-File Implementation Checklist
+
+### Data and Features
+- `src/data/nba_api_client.py`: game logs, player logs, tracking.
+- `src/data/kaggle_client.py`: SOS/SRS ingestion.
+- `src/data/build_roster_set.py`: roster top-N as-of date; rolling stats; embedding indices.
+- `src/features/rolling.py`: `shift(1)` before roll; DNP handling.
+- `src/features/team_context.py`: Four Factors, SOS/SRS, pace; no net_rating.
+
+### Models and Training
+- `src/models/player_encoder.py`: shared MLP for player vectors.
+- `src/models/set_attention.py`: masked attention; minutes-weighting rule.
+- `src/models/deep_set_rank.py`: Z extraction + rank head.
+- `src/models/listmle_loss.py`: logsumexp-stable ListMLE.
+- `src/models/xgboost_ensemble.py`, `rf_ensemble.py`: tabular ensemble.
+- `src/models/stacking.py`: RidgeCV meta-learner on OOF.
+- `src/training/train_model_a.py`: Deep Set training, OOF support.
+- `src/training/train_model_b.py`: XGB/RF training with proper splits.
+- `src/training/train_stacking.py`: pooled OOF training.
+
+### Evaluation and Outputs
+- `src/evaluation/metrics.py`: NDCG, Spearman, MRR, Brier, ROC-AUC.
+- `src/evaluation/evaluate.py`: baselines + diagnostics.
+- `src/inference/predict.py`: JSON outputs, ensemble diagnostics.
+
+### Visualization
+- `src/viz/accuracy_plot.py`, `fraud_sleeper.py`, `shap_heatmap.py`
+- `src/viz/attention_roster.py`, `sleeper_timeline.py`
+
+### Config and Scripts
+- `config/defaults.yaml`: seasons, paths, seeds, season boundaries.
+- `scripts/1_download_raw.py` to `6_run_inference.py`: full pipeline.
