@@ -1,12 +1,24 @@
 ---
 name: Fix Issues for Final Pipeline Run
-overview: Comprehensive fixes for attention weights, playoff ranks, roster logic, and hyperparameter alignment to achieve trustworthy final results. Includes debugging, fixes, validation, and a pre-flight checklist.
+overview: Comprehensive fixes for attention weights, playoff ranks, roster logic, pipeline ordering, evaluation consistency, and hyperparameter alignment to achieve trustworthy final results. Merged with fix_attention_+_trustworthy_run plan.
 todos:
   - id: update-hyperparams
     content: Update config/defaults.yaml with sweep-aligned hyperparameters (epochs=28, val_frac=0.25, XGB 250/4/0.08)
     status: pending
+  - id: fix-pipeline-order
+    content: Fix run_full_pipeline.py to run inference BEFORE evaluation (currently runs eval before inference = stale metrics)
+    status: pending
+  - id: fix-eval-fallback
+    content: Remove EOS_global_rank to EOS_conference_rank fallback chain in 5_evaluate.py; fail fast if EOS_global_rank missing
+    status: pending
   - id: fix-attention-minutes
     content: Fix set_attention.py minutes reweighting (simplify to soft bias or make optional)
+    status: pending
+  - id: fix-attention-fallback
+    content: In predict.py, mark contributors empty with contributors_are_fallback=true instead of fabricating zero-weight contributors
+    status: pending
+  - id: add-model-validation
+    content: Add model existence validation in predict.py - abort with clear error if no models loaded
     status: pending
   - id: fix-playoff-threshold
     content: Relax playoffs.py threshold from 16 to 8 and add debug logging
@@ -16,6 +28,9 @@ todos:
     status: pending
   - id: add-attention-debug
     content: Add final attention stats logging to train_model_a.py
+    status: pending
+  - id: add-leakage-to-pipeline
+    content: Add run_leakage_tests.py to run_full_pipeline.py before training steps
     status: pending
   - id: create-preflight
     content: Create scripts/preflight_check.py validation script
@@ -95,7 +110,100 @@ with torch.no_grad():
 
 ---
 
-## Issue 2: Playoff Rank Not Working (All 17-30)
+## Issue 2: Pipeline Order Bug (CRITICAL)
+
+### Root Cause Analysis
+
+In [scripts/run_full_pipeline.py](scripts/run_full_pipeline.py), the steps are ordered incorrectly:
+- **Current order:** ... → evaluate → explain → inference
+- **Correct order:** ... → inference → evaluate → explain
+
+This causes `eval_report.json` to be computed on the **previous** run's predictions, not the current run.
+
+### Fix
+
+Reorder steps in `run_full_pipeline.py`:
+
+```python
+# Correct order:
+# 1. download_raw
+# 2. build_db
+# 3. run_leakage_tests  # ADD THIS
+# 4. train_model_a
+# 5. train_model_b
+# 6. train_stacking
+# 7. run_inference      # BEFORE evaluate
+# 8. evaluate           # AFTER inference
+# 9. explain
+```
+
+---
+
+## Issue 3: Evaluation Fallback Chain (CRITICAL)
+
+### Root Cause Analysis
+
+In [scripts/5_evaluate.py](scripts/5_evaluate.py), there's a fallback chain:
+```python
+act = analysis.get("EOS_global_rank")
+if act is None:
+    act = analysis.get("actual_global_rank")
+if act is None:
+    act = analysis.get("EOS_conference_rank")
+```
+
+This mixes 1-30 and 1-15 scales, producing misleading metrics.
+
+### Fix
+
+Remove the fallback chain. Use **only** `EOS_global_rank` and fail fast if missing:
+
+```python
+act = analysis.get("EOS_global_rank")
+if act is None:
+    print(f"Warning: Missing EOS_global_rank for team {t.get('team_name')}")
+    continue  # Skip this team in metrics
+```
+
+---
+
+## Issue 4: Model Existence Validation
+
+### Root Cause Analysis
+
+In [src/inference/predict.py](src/inference/predict.py), if no models are loaded, inference silently produces zeroed outputs instead of failing.
+
+### Fix
+
+Add model existence validation at the start of `run_inference_from_db`:
+
+```python
+if model_a is None and xgb is None and rf is None:
+    raise RuntimeError("No models loaded. Run training scripts (3, 4, 4b) first.")
+```
+
+---
+
+## Issue 5: Attention Fallback Policy
+
+### Root Cause Analysis
+
+Current code fabricates zero-weight contributors when attention is all zero/non-finite. This is misleading.
+
+### Fix
+
+In `predict.py`, improve the fallback policy:
+
+```python
+if not contrib and max_len > 0:
+    # Don't fabricate - mark as fallback with empty list
+    attention_by_team[tid] = []
+    attention_fallback_by_team[tid] = True
+```
+
+---
+
+## Issue 6: Playoff Rank Not Working (All 17-30)
 
 ### Root Cause Analysis
 
@@ -206,26 +314,43 @@ Create a validation script that checks all prerequisites before a full pipeline 
 
 ## Implementation Order
 
-1. **Update hyperparameters** in defaults.yaml (sweep-aligned)
-2. **Fix set_attention.py** minutes reweighting (simplify or make optional)
-3. **Fix playoffs.py** relaxed threshold + debug logging
-4. **Add roster debug logging** in build_roster_set.py
-5. **Create preflight_check.py** for validation
-6. **Retrain models** from scratch (delete old checkpoints)
-7. **Run full pipeline** and verify attention + playoff metrics
-8. **Update Performance_trajectory.md** with final results
+1. **Fix pipeline order** in run_full_pipeline.py (CRITICAL - inference before evaluate)
+2. **Fix evaluation fallback chain** in 5_evaluate.py (CRITICAL - use only EOS_global_rank)
+3. **Add model validation** in predict.py (abort if no models)
+4. **Update hyperparameters** in defaults.yaml (sweep-aligned)
+5. **Fix set_attention.py** minutes reweighting (simplify or make optional)
+6. **Fix attention fallback policy** in predict.py (don't fabricate zero-weight contributors)
+7. **Fix playoffs.py** relaxed threshold + debug logging
+8. **Add roster debug logging** in build_roster_set.py
+9. **Add leakage tests** to run_full_pipeline.py
+10. **Create preflight_check.py** for validation
+11. **Delete old model checkpoints** to force full retrain
+12. **Run full pipeline** and verify all metrics
+13. **Update Performance_trajectory.md** with final results
 
 ---
 
 ## Verification Checklist (After Pipeline Run)
 
+**Pipeline / Eval Integrity:**
+- [ ] `eval_report.json` references the **same run_id** just produced (not stale)
+- [ ] No model loading errors or zeroed outputs in inference
+- [ ] Leakage tests pass before training
+
+**Attention / Explainability:**
 - [ ] Attention weights in predictions.json are non-zero for some teams
 - [ ] `attn_sum_mean` in training/inference logs is close to 1.0
+- [ ] `contributors_are_fallback` is false for most teams (not all fallbacks)
+- [ ] Loss decreases during training (not flat at 27.8993)
+
+**Playoff / Roster:**
 - [ ] Playoff metrics present in eval_report.json (`playoff_metrics` section)
 - [ ] `playoff_rank` in predictions.json includes values 1-16 (not all 17-30)
 - [ ] No roster contamination (spot-check Boston, Milwaukee rosters)
-- [ ] Loss decreases during training (not flat)
+
+**Performance:**
 - [ ] NDCG >= 0.64, Spearman >= 0.72 (maintain or improve)
+- [ ] MRR may still be 0 (expected given top-2 definition)
 
 ---
 
@@ -233,10 +358,27 @@ Create a validation script that checks all prerequisites before a full pipeline 
 
 | File | Changes |
 |------|---------|
-| [config/defaults.yaml](config/defaults.yaml) | Update epochs, val_frac, XGB params |
-| [src/models/set_attention.py](src/models/set_attention.py) | Simplify minutes reweighting, add option to return raw |
-| [src/evaluation/playoffs.py](src/evaluation/playoffs.py) | Relax threshold, add debug logging |
+| [scripts/run_full_pipeline.py](scripts/run_full_pipeline.py) | **CRITICAL:** Reorder to run inference BEFORE evaluate; add leakage tests |
+| [scripts/5_evaluate.py](scripts/5_evaluate.py) | **CRITICAL:** Remove EOS_global_rank fallback chain; fail fast if missing |
+| [src/inference/predict.py](src/inference/predict.py) | Add model existence validation; fix attention fallback policy |
+| [config/defaults.yaml](config/defaults.yaml) | Update epochs=28, val_frac=0.25, XGB 250/4/0.08 |
+| [src/models/set_attention.py](src/models/set_attention.py) | Simplify minutes reweighting to soft bias |
+| [src/evaluation/playoffs.py](src/evaluation/playoffs.py) | Relax threshold from 16 to 8, add debug logging |
 | [src/features/build_roster_set.py](src/features/build_roster_set.py) | Add roster debug logging |
 | [src/training/train_model_a.py](src/training/train_model_a.py) | Add final attention stats logging |
 | [scripts/preflight_check.py](scripts/preflight_check.py) | New validation script |
 | [.cursor/plans/Performance_trajectory_and_hyperparameters.md](.cursor/plans/Performance_trajectory_and_hyperparameters.md) | Update with fixes and final hyperparams |
+
+## Pipeline Flow (Corrected)
+
+```mermaid
+flowchart TD
+  BuildDB[scripts.2_build_db] --> LeakTests[scripts.run_leakage_tests]
+  LeakTests --> TrainA[scripts.3_train_model_a]
+  LeakTests --> TrainB[scripts.4_train_model_b]
+  TrainA --> Stack[scripts.4b_train_stacking]
+  TrainB --> Stack
+  Stack --> Infer[scripts.6_run_inference]
+  Infer --> Eval[scripts.5_evaluate]
+  Eval --> Explain[scripts.5b_explain]
+```
