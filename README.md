@@ -39,7 +39,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 Used for training (optional) and evaluation when playoff data exists. **Phase 1:** Rank playoff teams by total playoff wins (desc). **Phase 2:** Tie-break by regular-season win %. **Phase 3:** Non-playoff teams are ranked 17–30 by regular-season win %. Config: `training.target_rank: standings | playoffs` (default `standings`). Playoff rank is computed from `playoff_team_game_logs` + `playoff_games` using **season date ranges** from `defaults.yaml`; it will be null if playoff data is missing or incomplete for the target season.
 
 ## Evaluation
-- **Ranking:** NDCG, Spearman, MRR (MRR uses top_k=2 for two-conference “rank 1”).
+- **Ranking:** NDCG, Spearman, MRR (mrr_top2 = champion+runner-up, mrr_top4 = conference finals), Precision@4, Precision@2 (planned). Former MRR used top_k=2 for two-conference “rank 1”).
 - **Future outcomes:** Brier score.
 - **Sleeper detection:** ROC-AUC on upsets (sleeper = actual rank worse than predicted rank); constant-label guard returns 0.5.
 - **Playoff metrics** (when playoff data and predictions include post_playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), Brier score on championship odds (one-hot champion vs predicted odds). Section `playoff_metrics` in `eval_report.json`.
@@ -90,7 +90,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - [ ] **Time rule:** All features use only rows with `game_date < as_of_date` (strict t-1). Rolling stats use `shift(1)` before aggregation.
 - [ ] **Roster:** Minutes and roster selection use only games before `as_of_date`. Rosters use a **latest-team** map (player’s most recent team as of `as_of_date`) so traded players appear only on their current team; season boundaries from config scope games when building rosters.
 - [ ] **Model B:** Feature set must **not** include `net_rating`. Enforced in `src.features.team_context.FORBIDDEN` and `train_model_b`.
-- [ ] **ListMLE:** Targets are standings-to-date (win-rate), not season-end. Evaluation remains season-end.
+- [ ] **ListMLE:** Targets configurable: `listmle_target: final_rank` (EOS_playoff_standings) or `standings` (win-rate to date). Evaluation remains season-end.
 - [ ] **Baselines only:** Net Rating is used only in `rank-by-Net-Rating` baseline, computed from off/def ratings, never as a model input.
 
 ---
@@ -99,7 +99,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 
 All paths under `outputs/` (or `config.paths.outputs`). Produced from real data when DB and models exist. With `inference.run_id: null`, each pipeline run writes to a new folder (`outputs/run_002/`, `outputs/run_003/`, …); evaluation uses the latest run.
 
-- `eval_report.json` — NDCG, Spearman, MRR (top_k=2), ROC-AUC upset, `notes`; when playoff data exists, `playoff_metrics`. Planned: per-model metrics (ensemble, model_a, xgb, rf) and per-conference metrics (predicted vs actual conference rank).
+- `eval_report.json` — NDCG, Spearman, mrr_top2, mrr_top4, ROC-AUC upset, `notes`; per-model metrics (ensemble, model_a, xgb, rf); per-conference (predicted vs actual conference rank). When playoff data exists, `playoff_metrics`.
 - `outputs/run_001/predictions.json` — per-team `predicted_strength` (rank), `conference_rank` (1–15), `championship_odds`, `ensemble_score` (0–1 percentile), `actual_conference_rank` (Actual Conference Rank), `EOS_global_rank` (1–30 when available), `post_playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
 - `outputs/run_001/pred_vs_actual.png` — two panels (East/West): predicted vs actual conference rank (1–15); grid lines, team-colored points, legend.
 - `outputs/run_001/pred_vs_playoff_rank.png` — predicted global rank (1–30) vs playoff performance rank (1–30).
@@ -130,11 +130,12 @@ Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batch
 
 ## Full Plan
 
-See `.cursor/plans/Plan.md`. Planned extensions: [.cursor/plans/Update1.md](.cursor/plans/Update1.md), [.cursor/plans/Update2.md](.cursor/plans/Update2.md), [.cursor/plans/Update3.md](.cursor/plans/Update3.md), [.cursor/plans/Update4.md](.cursor/plans/Update4.md), [.cursor/plans/Update5.md](.cursor/plans/Update5.md), [.cursor/plans/Update6.md](.cursor/plans/Update6.md).
+See `.cursor/plans/Plan.md`. Planned extensions: [.cursor/plans/Update1.md](.cursor/plans/Update1.md) through [.cursor/plans/Update8.md](.cursor/plans/Update8.md).
+
+**Comprehensive expansion plan:** [.cursor/plans/comprehensive_feature_and_evaluation_expansion.plan.md](.cursor/plans/comprehensive_feature_and_evaluation_expansion.plan.md) — data evolution (First–Fourth Order metrics), Four Factors, SRS, Pythagorean, Elo, Massey, RAPM-lite, Bayesian Optimization (Optuna) for XGBoost, lineup continuity, fatigue, momentum, calibration (ECE, Platt Scaling), playoff residual model, and hyperparameter tuning strategy with NBA-specific XGBoost ranges.
 
 ---
 
 ## Implementation Roadmap
-The full phased development plan and file-by-file checklist are in
-`.cursor/plans/Plan.md` under **Development and Implementation Plan**.
-Update1 roadmap: `.cursor/plans/Update1.md`. Update2 roadmap: `.cursor/plans/Update2.md`. Update3 roadmap: `.cursor/plans/Update3.md`. Update4 roadmap: `.cursor/plans/Update4.md`. Update5 roadmap: `.cursor/plans/Update5.md`. Update6 roadmap: `.cursor/plans/Update6.md`. Update7 roadmap: `.cursor/plans/Update7.md`. Update8 roadmap: `.cursor/plans/Update8.md`.
+
+The full phased development plan is in `.cursor/plans/Plan.md`. Update plans: Update1–Update8. **Comprehensive plan:** `.cursor/plans/comprehensive_feature_and_evaluation_expansion.plan.md` for feature engineering, tuning, and playoff residual architecture.
