@@ -1,0 +1,15 @@
+---
+description: When user says "run the script" (e.g. sweeps, pipeline), run in foreground with longest allowed timeout; never background. Follow the plan.
+alwaysApply: true
+---
+
+# Run scripts in foreground, as long as possible
+
+When the user asks to **run the script** (e.g. "run sweeps", "run the pipeline", "run sweep_hparams"):
+
+1. **Foreground only** — Run the command in the foreground. Do **not** use background execution (`is_background: true`).
+2. **Longest timeout** — Use the maximum timeout the run command supports (e.g. 24 hours or the tool limit) so the run is not cut off early. Let it run as long as possible.
+3. **Follow the plan** — Use the relevant plan (e.g. sweep-script-exec, run_full_pipeline_foreground) for working directory, PYTHONPATH, and step order. Run from the project root (worktree or main project as specified).
+4. **No chaining** — Prefer a single invocation with correct cwd and env; do not chain with `&&` in PowerShell (use `;` or separate commands if needed).
+
+Example: for sweeps, run `python -m scripts.sweep_hparams ...` from the project root with PYTHONPATH set, in the foreground, with the longest allowed timeout.

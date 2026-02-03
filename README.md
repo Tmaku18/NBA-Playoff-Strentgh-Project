@@ -11,7 +11,7 @@ January 28, 2026
 ## Overview
 This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Team Strength** using a Deep Set roster model plus a Hybrid tabular ensemble (XGBoost + Random Forest). The system targets **future outcomes** and identifies **Sleepers** versus **Paper Tigers** without circular evaluation.
 
-**Run 21 is the first real success:** Model A contributes (attention/contributors), ensemble ranking vs playoff outcome improved (NDCG, Spearman, MRR). From here on, **hyperparameter sweeps** and future test runs write to **`outputs3/`** (sweeps → `outputs3/sweeps/<batch_id>/`). See `outputs2/ANALYSIS.md` for run_020 vs run_021 comparison.
+**Run 21 and Run 22** are baseline full-pipeline runs (not sweep-optimized for a single metric). **Run 21** was the first real success: Model A contributes (attention/contributors), ensemble ranking vs playoff outcome improved. **Run 22** (EOS source: eos_final_rank) achieved NDCG 0.48, Spearman 0.43, playoff Spearman 0.46 — better than early sweeps that optimized only Spearman. Neither run_021 nor run_022 was tuned for NDCG-only or Spearman-only; they used the same default config. **Sweep strategy:** Run separate Optuna sweeps with `--objective spearman`, `--objective ndcg`, `--objective playoff_spearman`, or `--objective rank_mae`, then compare best configs across objectives. From here on, **hyperparameter sweeps** and future test runs write to **`outputs3/`** (sweeps → `outputs3/sweeps/<batch_id>/`). See **`outputs/ANALYSIS.md`** and **`outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md`** for run comparisons and metric definitions.
 
 ---
 
@@ -21,8 +21,8 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 - **No Net Rating leakage:** `net_rating` is excluded as a model input and never used as a target or evaluation metric (allowed only in baselines).
 - **Stacking:** K-fold **OOF** across **all training seasons**; level-2 **RidgeCV** on pooled OOF (not Logistic Regression).
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
-- **Model A training:** epochs configurable via `model_a.epochs` with optional validation-based early stopping (`early_stopping_*` in `defaults.yaml`).
-- **Attention stabilization:** Player stats now include usage features (minutes share, starter flag, rank feature), and `SetAttention` applies LayerNorm + residual connections, configurable temperature, entropy/diversity regularizers, attention dropout, and LR warmup (`model_a.attention.*`, `model_a.lr_warmup_steps`) to prevent collapse before fallback kicks in.
+- **Model A training:** epochs configurable via `model_a.epochs` with optional validation-based early stopping (`early_stopping_*` in `defaults.yaml`). Learning rate and gradient clipping are configurable (`model_a.learning_rate`, `model_a.grad_clip_max_norm`). Set attention uses **σReparam** on Q/K/V projections (Zhai et al., [arXiv:2303.06296](https://arxiv.org/abs/2303.06296)) to bound attention logits and reduce entropy collapse.
+- **Model A and attention collapse:** If training stops with "Model A is not learning" (flat loss), see [.cursor/plans/Attention_Report.md](.cursor/plans/Attention_Report.md) for investigation steps, references, and diagnostics. Enable `model_a.attention_debug: true` to log encoder/Z/scores, gradient norms, relevance, and player_stats; try different `learning_rate` or `grad_clip_max_norm` (e.g. 5.0) if flat loss may be due to over-clipping.
 - **Season config:** Hard-coded season date ranges in `defaults.yaml` to avoid play-in ambiguity.
 - **Explainability:** SHAP on Model B only; Integrated Gradients or permutation ablation for Model A.
 
@@ -72,7 +72,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 **Run order (production, real data only):**
 
 1. **Setup:** `pip install -r requirements.txt`
-2. **Config:** Edit `config/defaults.yaml` if needed (seasons, paths, model params, `build_db.skip_if_exists`, `inference.run_id`). DB path: `data/processed/nba_build_run.duckdb`. Model A stability knobs live under `model_a.attention` (temperature, dropout, entropy/diversity weights, minutes-bias warmup) and `model_a.lr_warmup_steps`. **Future runs and sweeps use `outputs3/`** (`config.paths.outputs`). The first run in an empty outputs folder can start at `run_001` (or use `inference.run_id_base`); with `inference.run_id: null` (default) runs auto-increment.
+2. **Config:** Edit `config/defaults.yaml` if needed (seasons, paths, model params, `build_db.skip_if_exists`, `inference.run_id`). DB path: `data/processed/nba_build_run.duckdb`. **Future runs and sweeps use `outputs3/`** (`config.paths.outputs`). The first run in an empty outputs folder can start at `run_001` (or use `inference.run_id_base`); with `inference.run_id: null` (default) runs auto-increment.
 3. **Data:**  
    - `python -m scripts.1_download_raw` — fetch regular-season and playoff logs via nba_api (writes to `data/raw/`; reuses existing files when present).  
    - `python -m scripts.2_build_db` — build DuckDB from raw → `data/processed/nba_build_run.duckdb`, update `data/manifest.json`. If `build_db.skip_if_exists: true` (default) and the DB file already exists, the build is skipped to keep the current DB.
@@ -82,9 +82,9 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
    - `python -m scripts.4b_train_stacking` — merge OOF parquets, RidgeCV → outputs dir `ridgecv_meta.joblib`, `oof_pooled.parquet` (requires OOF from 3 and 4).
 5. **Inference:** `python -m scripts.6_run_inference` — load DB and models, run Model A/B + meta → outputs dir `<run_id>/predictions.json`, plots. With `inference.run_id: null`, run_id auto-increments (e.g. run_019, run_020 when using `outputs2/` and `run_id_base: 19`) so each full pipeline run gets a new folder.
 6. **Evaluation:** `python -m scripts.5_evaluate` — uses predictions from the latest (or configured) run_id → outputs dir `eval_report.json` (NDCG, Spearman, MRR, ROC-AUC upset).
-7. **Explainability:** `python -m scripts.5b_explain` — SHAP on Model B (team-context X) → outputs dir `shap_summary.png`; attention ablation and Integrated Gradients (Model A) when Captum is installed → outputs dir `ig_model_a_attributions.txt`. Attention ablation skips padded roster slots and reports clearly when the masked forward yields NaN.
+7. **Explainability:** `python -m scripts.5b_explain` (uses `config/defaults.yaml`) or `python -m scripts.5b_explain --config path/to/config.yaml` — SHAP on Model B → `shap_summary.png`; attention ablation and Integrated Gradients (Model A) when Captum is installed → `ig_model_a_attributions.txt`. Use `--config` to run explain on a **sweep best combo** (e.g. `outputs3/sweeps/<batch_id>/combo_0002/config.yaml`).
 8. **Clone classifier (optional):** `python -m scripts.4c_train_classifier_clone --config config/clone_classifier.yaml` — XGBoost binary classifier (playoff team vs not) on Train 2015–2022, Val 2023, Holdout 2024; outputs `clone_classifier_report.json` (AUC-ROC, Brier).
-9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5, 4c) across configurable hyperparameter grid; writes to **`outputs3/sweeps/<batch_id>/`** (config: `paths.outputs` = `outputs3`). Use `--dry-run` to preview combos, `--max-combos N` to limit.
+9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5) per combo; writes to **`outputs3/sweeps/<batch_id>/`**. Use `--method optuna --n-trials N` for Bayesian tuning. **`--objective spearman|ndcg|playoff_spearman|rank_mae`** sets which metric Optuna optimizes (run separate sweeps for each objective and compare). After the sweep, **explain (5b_explain) runs automatically** on the best combo unless `--no-run-explain`. Use `--dry-run` to preview combos, `--max-combos N` to limit (grid only).
 
 **Optional:** `python -m scripts.run_manifest` (run manifest); `python -m scripts.run_leakage_tests` (before training); `python -m scripts.1b_download_injuries` (stub for injury data); `python -m scripts.1c_download_raptor` (RAPTOR CSV from FiveThirtyEight).
 
@@ -109,6 +109,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 All paths under the configured outputs dir (`outputs3/` for sweeps and new runs; `outputs2/` holds run_020/021). With `inference.run_id: null`, each pipeline run writes to a new folder (`outputs3/run_001/`, …); evaluation uses the latest run.
 
 - `eval_report.json` — NDCG, Spearman, mrr_top2, mrr_top4, ROC-AUC upset, `notes`; per-model metrics (ensemble, model_a, xgb, rf); per-conference (predicted vs actual conference rank). When playoff data exists, `playoff_metrics`.
+- `outputs2/run_022/` — baseline run with EOS source `eos_final_rank`: NDCG 0.48, Spearman 0.43, playoff Spearman 0.46; not optimized for a single metric. See `outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md` and `outputs/ANALYSIS.md` for run_021/022 insights and sweep strategy.
 - `outputs/run_001/predictions.json` — per-team `predicted_strength` (rank), `conference_rank` (1–15), `championship_odds`, `ensemble_score` (0–1 percentile), `actual_conference_rank` (Actual Conference Rank), `EOS_global_rank` (1–30 when available), `post_playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
 - `outputs/run_001/pred_vs_actual.png` — two panels (East/West): predicted vs actual conference rank (1–15); grid lines, team-colored points, legend.
 - `outputs/run_001/pred_vs_playoff_rank.png` — predicted global rank (1–30) vs playoff performance rank (1–30).
@@ -151,6 +152,8 @@ Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batch
 See `.cursor/plans/Plan.md`. Planned extensions: [.cursor/plans/Update1.md](.cursor/plans/Update1.md) through [.cursor/plans/Update8.md](.cursor/plans/Update8.md).
 
 **Comprehensive expansion plan:** [.cursor/plans/comprehensive_feature_and_evaluation_expansion.plan.md](.cursor/plans/comprehensive_feature_and_evaluation_expansion.plan.md) — data evolution (First–Fourth Order metrics), Four Factors, SRS, Pythagorean, Elo, Massey, RAPM-lite, Bayesian Optimization (Optuna) for XGBoost, lineup continuity, fatigue, momentum, calibration (ECE, Platt Scaling), playoff residual model, and hyperparameter tuning strategy with NBA-specific XGBoost ranges.
+
+**Hyperparameter testing evolution:** [docs/HYPERPARAMETER_TESTING_EVOLUTION.md](docs/HYPERPARAMETER_TESTING_EVOLUTION.md) — methodology changes from initial sweeps to grid, Optuna, successive halving, and phased Model B grids; decision steps, pros/cons, and research on optimization speed (with references).
 
 ---
 

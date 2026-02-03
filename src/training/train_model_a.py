@@ -13,24 +13,44 @@ from src.models.listmle_loss import listmle_loss
 from src.utils.repro import set_seeds
 
 
+def _grad_norm_for_module(module: nn.Module) -> float:
+    total = 0.0
+    for p in module.parameters():
+        if p.grad is not None:
+            total += p.grad.data.norm(2).item() ** 2
+    return total**0.5
+
+
 def _log_attention_debug_stats(model: nn.Module, batch: dict, device: torch.device) -> None:
-    """Log one-shot attention diagnostics: mask/minutes/attn sums + grad norm."""
+    """Log one-shot attention diagnostics: encoder z, Z, scores, attn, grad norms, player_stats."""
     B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
     embs = batch["embedding_indices"].to(device).reshape(B * K, P)
     stats = batch["player_stats"].to(device).reshape(B * K, P, S)
     minutes = batch["minutes"].to(device).reshape(B * K, P)
     mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
 
+    # Capture encoder output z via hook
+    z_captured: list[torch.Tensor] = []
+
+    def _hook(_module: nn.Module, _input: Any, output: torch.Tensor) -> None:
+        z_captured.append(output.detach())
+
+    handle = model.enc.register_forward_hook(_hook)
     model.train()
     model.zero_grad(set_to_none=True)
-    score, _, attn_w = model(embs, stats, minutes, mask)
+    score, Z_out, attn_w = model(embs, stats, minutes, mask)
+    handle.remove()
+    Z_out = Z_out.detach()
+    score_detach = score.detach()
+
     loss = score.mean()
     if torch.isfinite(loss).all():
         loss.backward()
-    grad_norm = 0.0
-    for p in model.attn.parameters():
-        if p.grad is not None:
-            grad_norm += p.grad.data.norm(2).item()
+
+    grad_norm_global = _grad_norm_for_module(model)
+    grad_norm_enc = _grad_norm_for_module(model.enc)
+    grad_norm_attn = _grad_norm_for_module(model.attn)
+    grad_norm_scorer = _grad_norm_for_module(model.scorer)
     model.zero_grad(set_to_none=True)
 
     with torch.no_grad():
@@ -42,6 +62,31 @@ def _log_attention_debug_stats(model: nn.Module, batch: dict, device: torch.devi
         attn_max = attn_w.max(dim=-1).values.reshape(-1)
         attn_sum_mean = float(torch.nanmean(attn_sum).item()) if attn_sum.numel() else 0.0
         attn_max_mean = float(torch.nanmean(attn_max).item()) if attn_max.numel() else 0.0
+
+        # Encoder z variance across teams (per-team vector -> variance over K)
+        z_var_str = "n/a"
+        if z_captured:
+            z = z_captured[0].reshape(B, K, P, -1)
+            z_per_team = z.mean(dim=2)
+            z_var = z_per_team.var(dim=1).mean().item()
+            z_var_str = f"{z_var:.6f}"
+
+        # Z variance across teams
+        Z_reshaped = Z_out.reshape(B, K, -1)
+        Z_var = float(Z_reshaped.var(dim=1).mean().item()) if Z_reshaped.numel() > 0 else 0.0
+
+        # Score stats (before nan_to_num in loss)
+        score_flat = score_detach.reshape(B, K)
+        score_min = float(score_flat.min().item())
+        score_max = float(score_flat.max().item())
+        score_mean = float(score_flat.mean().item())
+        score_nan = int(torch.isnan(score_flat).sum().item())
+
+        # player_stats: shape, min, max, mean
+        ps_min = float(stats.min().item())
+        ps_max = float(stats.max().item())
+        ps_mean = float(stats.mean().item())
+
         print(
             "Attention debug (train):",
             f"teams={attn_sum.numel()}",
@@ -51,7 +96,20 @@ def _log_attention_debug_stats(model: nn.Module, batch: dict, device: torch.devi
             f"minutes_max={float(minutes_valid.max().item()) if minutes_valid.numel() else 0.0:.4f}",
             f"attn_sum_mean={attn_sum_mean:.4f}",
             f"attn_max_mean={attn_max_mean:.4f}",
-            f"attn_grad_norm={grad_norm:.4f}",
+            f"attn_grad_norm={grad_norm_attn:.4f}",
+            f"grad_norm_global={grad_norm_global:.4f}",
+            f"grad_norm_enc={grad_norm_enc:.4f}",
+            f"grad_norm_scorer={grad_norm_scorer:.4f}",
+            f"z_var={z_var_str}",
+            f"Z_var={Z_var:.6f}",
+            f"score_min={score_min:.4f}",
+            f"score_max={score_max:.4f}",
+            f"score_mean={score_mean:.4f}",
+            f"score_nan={score_nan}",
+            f"player_stats_shape={tuple(stats.shape)}",
+            f"player_stats_min={ps_min:.4f}",
+            f"player_stats_max={ps_max:.4f}",
+            f"player_stats_mean={ps_mean:.4f}",
             flush=True,
         )
 
@@ -87,14 +145,14 @@ def train_epoch(
     batches: list[dict],
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    *,
+    grad_clip_max_norm: float = 1.0,
+    attention_debug: bool = False,
 ) -> float:
     model.train()
     total = 0.0
     n = 0
-    fallback_events = 0.0
-    fallback_total = 0.0
-    entropy_min = float("inf")
-    entropy_max = 0.0
+    first_batch = True
     for batch in batches:
         B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
         embs = batch["embedding_indices"].to(device).reshape(B * K, P)
@@ -103,56 +161,52 @@ def train_epoch(
         mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
         rel = batch["rel"].to(device)
 
-        score, _, attn_w = model(embs, stats, minutes, mask)
+        if attention_debug and first_batch:
+            with torch.no_grad():
+                rel_ = rel.cpu()
+                print(
+                    "Rel (first batch):",
+                    f"shape={tuple(rel_.shape)}",
+                    flush=True,
+                )
+                for row in range(rel_.shape[0]):
+                    r = rel_[row]
+                    print(
+                        f"  row_{row} rel_min={float(r.min().item()):.4f}",
+                        f"rel_max={float(r.max().item()):.4f}",
+                        f"rel_mean={float(r.mean().item()):.4f}",
+                        flush=True,
+                    )
+                st = stats.cpu()
+                print(
+                    "Player_stats (first batch):",
+                    f"shape={tuple(st.shape)}",
+                    f"min={float(st.min().item()):.4f}",
+                    f"max={float(st.max().item()):.4f}",
+                    f"mean={float(st.mean().item()):.4f}",
+                    flush=True,
+                )
+            first_batch = False
+
+        score, _, _ = model(embs, stats, minutes, mask)
         score = score.reshape(B, K)
         score = torch.nan_to_num(score, nan=0.0, posinf=10.0, neginf=-10.0)
         loss = listmle_loss(score, rel)
-        extra_loss = 0.0
-        entropy_weight = float(getattr(model, "attention_entropy_weight", 0.0))
-        diversity_weight = float(getattr(model, "attention_head_diversity_weight", 0.0))
-        if attn_w is not None:
-            attn_safe_all = torch.clamp(attn_w, min=1e-8)
-            entropies = -(attn_safe_all * attn_safe_all.log()).sum(dim=-1)
-            entropy_min = min(entropy_min, float(entropies.min().item()))
-            entropy_max = max(entropy_max, float(entropies.max().item()))
-        if entropy_weight > 0.0 and attn_w is not None:
-            attn_safe = torch.clamp(attn_w, min=1e-8)
-            entropy = -(attn_safe * attn_safe.log()).sum(dim=-1)
-            entropy_loss = -entropy.mean()
-            extra_loss = extra_loss + entropy_weight * entropy_loss
-        head_w = getattr(model.attn, "last_head_attention", None)
-        if diversity_weight > 0.0 and head_w is not None and head_w.ndim == 3:
-            hw = head_w
-            hw = hw / hw.sum(dim=-1, keepdim=True).clamp(min=1e-8)
-            norm_hw = hw / hw.norm(dim=-1, keepdim=True).clamp(min=1e-8)
-            sim = torch.matmul(norm_hw, norm_hw.transpose(1, 2))
-            num_heads = sim.shape[1]
-            if num_heads > 1:
-                eye = torch.eye(num_heads, device=sim.device, dtype=sim.dtype).unsqueeze(0)
-                off_diag = sim - eye
-                diversity_loss = off_diag.pow(2).mean()
-                extra_loss = extra_loss + diversity_weight * diversity_loss
-        collapsed_mask = getattr(model.attn, "last_collapsed_mask", None)
-        if collapsed_mask is not None:
-            fallback_events += float(collapsed_mask.float().sum().item())
-            fallback_total += float(collapsed_mask.numel())
-        loss = loss + extra_loss
         optimizer.zero_grad()
         if torch.isfinite(loss).all():
             loss.backward()
-            attn_clip = float(getattr(model, "attention_grad_clip", 0.0))
-            if attn_clip > 0.0:
-                torch.nn.utils.clip_grad_norm_(model.attn.parameters(), max_norm=attn_clip)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            if attention_debug and n == 0:
+                grad_norm_before = _grad_norm_for_module(model)
+                print(
+                    "Grad norm before clip (first batch):",
+                    f"grad_norm={grad_norm_before:.4f}",
+                    f"max_norm={grad_clip_max_norm}",
+                    flush=True,
+                )
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_max_norm)
             optimizer.step()
             total += loss.item()
             n += 1
-    stats_summary = {
-        "fallback_frac": (fallback_events / fallback_total) if fallback_total else 0.0,
-        "entropy_min": entropy_min if entropy_min != float("inf") else 0.0,
-        "entropy_max": entropy_max,
-    }
-    model.last_train_stats = stats_summary
     return total / n if n else 0.0
 
 
@@ -262,12 +316,7 @@ def _build_model(config: dict, device: torch.device, stat_dim_override: int | No
     minutes_bias_weight = float(ma.get("minutes_bias_weight", 0.3))
     minutes_sum_min = float(ma.get("minutes_sum_min", 1e-6))
     fallback_strategy = str(ma.get("attention_fallback_strategy", "minutes"))
-    attn_cfg = ma.get("attention", {})
-    attn_temperature = float(attn_cfg.get("temperature", 1.0))
-    attn_input_dropout = float(attn_cfg.get("input_dropout", 0.0))
-    attn_use_pre_norm = bool(attn_cfg.get("use_pre_norm", True))
-    attn_use_residual = bool(attn_cfg.get("use_residual", True))
-    model = DeepSetRank(
+    return DeepSetRank(
         num_emb,
         emb_dim,
         stat_dim,
@@ -277,17 +326,7 @@ def _build_model(config: dict, device: torch.device, stat_dim_override: int | No
         minutes_bias_weight=minutes_bias_weight,
         minutes_sum_min=minutes_sum_min,
         fallback_strategy=fallback_strategy,
-        attention_temperature=attn_temperature,
-        attention_input_dropout=attn_input_dropout,
-        attention_use_pre_norm=attn_use_pre_norm,
-        attention_use_residual=attn_use_residual,
     ).to(device)
-    model.attention_entropy_weight = float(attn_cfg.get("entropy_weight", 0.0))
-    model.attention_head_diversity_weight = float(attn_cfg.get("head_diversity_weight", 0.0))
-    model.attention_grad_clip = float(attn_cfg.get("grad_clip", 0.0))
-    model.initial_minutes_bias_weight = float(minutes_bias_weight)
-    model.minutes_bias_warmup_epochs = int(attn_cfg.get("minutes_bias_warmup_epochs", 0))
-    return model
 
 
 def train_model_a_on_batches(
@@ -306,8 +345,10 @@ def train_model_a_on_batches(
         model = _build_model(config, device)
         return model
     model = _build_model(config, device, stat_dim_override=stat_dim_override)
-    base_lr = float(ma.get("learning_rate", 1e-3))
-    optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
+    lr = float(ma.get("learning_rate", 1e-3))
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
+    attention_debug = bool(ma.get("attention_debug", False))
     epochs = int(max_epochs) if max_epochs is not None else int(ma.get("epochs", 20))
     patience = int(ma.get("early_stopping_patience", 3))
     min_delta = float(ma.get("early_stopping_min_delta", 0.0))
@@ -317,25 +358,16 @@ def train_model_a_on_batches(
     bad_epochs = 0
     best_train_loss = float("inf")
     train_no_improve = 0
-    warmup_steps = int(ma.get("lr_warmup_steps", 0))
-    bias_warmup = int(getattr(model, "minutes_bias_warmup_epochs", 0))
-    base_bias = float(getattr(model, "initial_minutes_bias_weight", getattr(model.attn, "minutes_bias_weight", 0.3)))
     for epoch in range(epochs):
-        if warmup_steps > 0:
-            scale = min(1.0, float(epoch + 1) / warmup_steps)
-            for group in optimizer.param_groups:
-                group["lr"] = base_lr * scale
-        if bias_warmup > 0:
-            model.attn.minutes_bias_weight = 0.0 if epoch < bias_warmup else base_bias
-        loss = train_epoch(model, batches, optimizer, device)
-        stats = getattr(model, "last_train_stats", {})
-        extra_log = ""
-        if stats:
-            extra_log = (
-                f" fallback={stats.get('fallback_frac', 0.0):.3f}"
-                f" entropy=[{stats.get('entropy_min', 0.0):.3f},{stats.get('entropy_max', 0.0):.3f}]"
-            )
-        print(f"epoch {epoch+1} loss={loss:.4f}{extra_log}", flush=True)
+        loss = train_epoch(
+            model,
+            batches,
+            optimizer,
+            device,
+            grad_clip_max_norm=grad_clip_max_norm,
+            attention_debug=attention_debug,
+        )
+        print(f"epoch {epoch+1} loss={loss:.4f}", flush=True)
         if loss < best_train_loss:
             best_train_loss = loss
             train_no_improve = 0
@@ -362,7 +394,6 @@ def train_model_a_on_batches(
                 break
     if best_state is not None:
         model.load_state_dict(best_state)
-    model.attn.minutes_bias_weight = base_bias
     return model
 
 
@@ -386,8 +417,10 @@ def train_model_a(
     num_emb = ma.get("num_embeddings", 500)
     stat_dim_override = int(batches[0]["player_stats"].shape[-1]) if batches else None
     model = _build_model(config, device, stat_dim_override=stat_dim_override)
-    base_lr = float(ma.get("learning_rate", 1e-3))
-    optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
+    lr = float(ma.get("learning_rate", 1e-3))
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
+    attention_debug = bool(ma.get("attention_debug", False))
 
     if batches is None:
         batches = [get_dummy_batch(4, 10, 15, stat_dim, num_emb, device) for _ in range(5)]
@@ -404,25 +437,16 @@ def train_model_a(
     bad_epochs = 0
     best_train_loss = float("inf")
     train_no_improve = 0
-    warmup_steps = int(ma.get("lr_warmup_steps", 0))
-    bias_warmup = int(getattr(model, "minutes_bias_warmup_epochs", 0))
-    base_bias = float(getattr(model, "initial_minutes_bias_weight", getattr(model.attn, "minutes_bias_weight", 0.3)))
     for epoch in range(epochs):
-        if warmup_steps > 0:
-            scale = min(1.0, float(epoch + 1) / warmup_steps)
-            for group in optimizer.param_groups:
-                group["lr"] = base_lr * scale
-        if bias_warmup > 0:
-            model.attn.minutes_bias_weight = 0.0 if epoch < bias_warmup else base_bias
-        loss = train_epoch(model, train_batches, optimizer, device)
-        stats = getattr(model, "last_train_stats", {})
-        extra_log = ""
-        if stats:
-            extra_log = (
-                f" fallback={stats.get('fallback_frac', 0.0):.3f}"
-                f" entropy=[{stats.get('entropy_min', 0.0):.3f},{stats.get('entropy_max', 0.0):.3f}]"
-            )
-        print(f"epoch {epoch+1} loss={loss:.4f}{extra_log}", flush=True)
+        loss = train_epoch(
+            model,
+            train_batches,
+            optimizer,
+            device,
+            grad_clip_max_norm=grad_clip_max_norm,
+            attention_debug=attention_debug,
+        )
+        print(f"epoch {epoch+1} loss={loss:.4f}", flush=True)
         if loss < best_train_loss:
             best_train_loss = loss
             train_no_improve = 0
@@ -451,7 +475,6 @@ def train_model_a(
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    model.attn.minutes_bias_weight = base_bias
     if batches and bool(ma.get("attention_debug", False)):
         try:
             _log_attention_debug_stats(model, batches[0], device)

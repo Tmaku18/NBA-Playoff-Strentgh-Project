@@ -1,4 +1,10 @@
-"""Run SHAP (Model B) and attention ablation (Model A) on real data from DB."""
+"""Run SHAP (Model B) and attention ablation (Model A) on real data from DB.
+
+Usage:
+  python -m scripts.5b_explain
+  python -m scripts.5b_explain --config path/to/config.yaml   # e.g. sweep best combo
+"""
+import argparse
 import math
 import sys
 from pathlib import Path
@@ -13,12 +19,20 @@ sys.path.insert(0, str(ROOT))
 
 
 def main():
-    with open(ROOT / "config" / "defaults.yaml", "r", encoding="utf-8") as f:
+    parser = argparse.ArgumentParser(description="Explain Model B (SHAP) and Model A (attention/IG)")
+    parser.add_argument("--config", type=str, default=None, help="Path to config YAML; default: config/defaults.yaml")
+    args = parser.parse_args()
+    config_path = Path(args.config) if args.config else ROOT / "config" / "defaults.yaml"
+    if not config_path.is_absolute():
+        config_path = ROOT / config_path
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     out = Path(config["paths"]["outputs"])
     if not out.is_absolute():
         out = ROOT / out
-    db_path = ROOT / config["paths"]["db"]
+    db_path = Path(config["paths"]["db"])
+    if not db_path.is_absolute():
+        db_path = ROOT / db_path
     if not db_path.exists():
         print("Database not found. Run scripts 1_download_raw and 2_build_db first.", file=sys.stderr)
         sys.exit(1)
@@ -82,15 +96,15 @@ def main():
         if not valid_lists:
             print("No valid lists for attention ablation.", file=sys.stderr)
         else:
-            device = torch.device("cpu")
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             batches_a, _ = build_batches_from_lists(valid_lists[:1], games, tgl, teams, pgl, config, device=device)
             if not batches_a:
                 print("No batches for attention ablation.", file=sys.stderr)
             else:
-                ck = torch.load(model_a_path, map_location="cpu", weights_only=False)
+                ck = torch.load(model_a_path, map_location=device, weights_only=False)
                 ma = config.get("model_a", {})
-                attn_cfg = ma.get("attention", {})
-                stat_dim = int(batch["player_stats"].shape[-1])
+                # Use stat_dim from batch so model matches checkpoint (trained with same data)
+                stat_dim = int(batches_a[0]["player_stats"].shape[-1])
                 model = DeepSetRank(
                     ma.get("num_embeddings", 500),
                     ma.get("embedding_dim", 32),
@@ -100,14 +114,10 @@ def main():
                     ma.get("dropout", 0.2),
                     minutes_bias_weight=float(ma.get("minutes_bias_weight", 0.3)),
                     minutes_sum_min=float(ma.get("minutes_sum_min", 1e-6)),
-                    fallback_strategy=str(ma.get("attention_fallback_strategy", "minutes")),
-                    attention_temperature=float(attn_cfg.get("temperature", 1.0)),
-                    attention_input_dropout=float(attn_cfg.get("input_dropout", 0.0)),
-                    attention_use_pre_norm=bool(attn_cfg.get("use_pre_norm", True)),
-                    attention_use_residual=bool(attn_cfg.get("use_residual", True)),
                 )
                 if "model_state" in ck:
                     model.load_state_dict(ck["model_state"])
+                model = model.to(device)
                 model.eval()
                 batch = batches_a[0]
                 emb = batch["embedding_indices"].to(device).reshape(-1, batch["embedding_indices"].shape[2])

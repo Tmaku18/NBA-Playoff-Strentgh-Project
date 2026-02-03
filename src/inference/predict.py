@@ -355,7 +355,7 @@ def run_inference_from_db(
         sorted_global = sorted(win_rate_map.items(), key=lambda x: (-x[1], x[0]))
         actual_global_rank = {tid: i + 1 for i, (tid, _) in enumerate(sorted_global)}
 
-        device = torch.device("cpu")  # Match load_models map_location="cpu"
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         tid_to_score_a: dict[int, float] = {}
         attention_by_team: dict[int, list[tuple[str, float]]] = {}  # team_id -> [(player_name, weight), ...]
         attention_fallback_by_team: dict[int, bool] = {}
@@ -364,6 +364,7 @@ def run_inference_from_db(
         batches_a: list[dict[str, Any]] = []
         attn_debug = {"teams": 0, "empty_roster": 0, "all_zero": 0, "attn_sum": [], "attn_max": []}
         if model_a is not None:
+            model_a = model_a.to(device)
             batches_a, list_metas = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
             if batches_a:
                 scores_list, attn_list = predict_batches_with_attention(model_a, batches_a, device)
@@ -551,8 +552,19 @@ def run_inference_from_db(
                     if eos_final_rank_map and len(eos_final_rank_map) >= 16:
                         actual_global_rank = {int(tid): int(r) for tid, r in eos_final_rank_map.items()}
                         eos_rank_source = "eos_final_rank"
-            except Exception:
-                pass
+            except Exception as e:
+                print(
+                    f"EOS/playoff rank failed (falling back to standings): {e}",
+                    file=sys.stderr,
+                )
+
+        if config.get("inference", {}).get("require_eos_final_rank", False) and eos_rank_source != "eos_final_rank":
+            print(
+                "Inference requires eos_final_rank (playoff-based EOS) but DB returned standings. "
+                "Ensure DB has playoff_games and playoff_team_game_logs populated (run 2_build_db with playoff raw data).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
         preds = predict_teams(
             unique_team_ids,

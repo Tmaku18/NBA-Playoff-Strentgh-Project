@@ -17,6 +17,14 @@ outputs2/run_022/*
 !outputs2/run_022/ANALYSIS_02.md
 outputs3/*
 !outputs3/.gitkeep
+!outputs3/sweeps/
+!outputs3/sweeps/*/
+outputs3/sweeps/*/*
+!outputs3/sweeps/*/sweep_results.csv
+!outputs3/sweeps/*/sweep_results_summary.json
+!outputs3/sweeps/*/sweep_config.json
+!outputs3/sweeps/*/optuna_study.json
+!outputs3/sweeps/*/optuna_importances.json
 .current_run
 __pycache__/
 *.py[cod]

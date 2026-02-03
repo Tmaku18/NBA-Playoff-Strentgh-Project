@@ -1,6 +1,6 @@
 # Pipeline Outputs Analysis
 
-This document explains what each output means, interprets the current results, compares against past runs, and flags potential errors or bugs.
+This document explains what each output means, interprets the current results, compares against past runs (including run_021 and run_022), clarifies optimization targets (NDCG vs Spearman), and describes the sweep strategy (different target metrics per sweep, then compare).
 
 ---
 
@@ -64,7 +64,31 @@ Within each conference, Spearman is **negative** while global Spearman is **+0.7
 
 ---
 
-## 3. Comparison Against Past Runs
+## 3. Run 021 and Run 022 (baseline runs; optimization target)
+
+**Run 021** and **run_022** are full-pipeline baseline runs (default config); neither was produced by a sweep optimized for a single metric.
+
+- **Run 021:** First "real success" per project README: Model A contributes (attention/contributors), ensemble ranking vs playoff outcome improved. Not tuned for NDCG-only or Spearman-only; same default hyperparameters as the rest of the pipeline.
+- **Run 022** (EOS source: **eos_final_rank**): Ensemble NDCG **0.482**, Spearman **0.4305**, playoff Spearman **0.4607**, NDCG@4 final four **0.4645**, Brier championship **0.032**. Per season: 2023-24 NDCG 0.559 / Spearman 0.31; 2024-25 NDCG 0.482 / Spearman 0.43. Per conference (2024-25): East NDCG 0.25 / Spearman 0.25; West NDCG 0.75 / Spearman 0.50. See `outputs2/run_022/ANALYSIS_01.md` and `outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md`.
+
+**Clarification:** Run_021 and run_022 were **not** optimized for NDCG or Spearman in isolation; they used the same default config. They often outperform early sweeps that optimized only Spearman because the default config balances multiple objectives. For fair comparison, run **separate sweeps** each optimizing a different target (see §4).
+
+---
+
+## 4. Sweep strategy: different target metrics per sweep, then compare
+
+We run **one objective per Optuna sweep** and compare best configs across objectives:
+
+- **`--objective spearman`** — maximize `test_metrics_ensemble_spearman` (global ordering).
+- **`--objective ndcg`** — maximize `test_metrics_ensemble_ndcg` (top-heavy ranking).
+- **`--objective playoff_spearman`** — maximize `test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank` (pred vs playoff outcome).
+- **`--objective rank_mae`** — minimize `test_metrics_ensemble_rank_mae_pred_vs_playoff` (rank distance).
+
+Example: run four sweeps (e.g. with `--n-trials 10` each), then compare the best combo from each in `sweep_results_summary.json` and `sweep_results.csv`. After each sweep, **5b_explain** runs automatically on the best combo for that objective (unless `--no-run-explain`). Use `python -m scripts.5b_explain --config <sweeps_dir>/<batch_id>/combo_<NNNN>/config.yaml` to explain any combo manually.
+
+---
+
+## 5. Comparison Against Past Runs
 
 Metrics below are computed from each run’s `predictions.json` using the same logic as script 5 (NDCG@10, Spearman, MRR, ROC-AUC upset). Source: `scripts/compare_runs.py` → `outputs/run_comparison.json`.
 
@@ -90,7 +114,7 @@ Metrics below are computed from each run’s `predictions.json` using the same l
 
 ---
 
-## 4. How the Model Is Performing (Summary)
+## 6. How the Model Is Performing (Summary)
 
 - **Ranking (standings-based):** The ensemble’s predicted order of teams is **well aligned with actual end-of-season strength** on the held-out test snapshot: NDCG 0.67, Spearman 0.76. That is a clear improvement over past runs and indicates the model is learning useful signal.
 - **Upset detection:** ROC-AUC 0.65 shows **moderate** ability to identify teams that were under-ranked by standings (sleepers) vs not.
@@ -116,7 +140,7 @@ Examples:
 
 ---
 
-## 6. Known Issues and Caveats
+## 8. Known Issues and Caveats
 
 | Item | Status / Deduction |
 |------|--------------------|
@@ -138,7 +162,7 @@ Examples:
 
 ---
 
-## 8. Analysis Summary and Inferences from the Data
+## 10. Analysis Summary and Inferences from the Data
 
 ### Current results (run_016) — what they mean
 

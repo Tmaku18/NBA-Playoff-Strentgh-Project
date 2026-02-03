@@ -17,7 +17,8 @@ seasons:
   "2025-26": { start: "2025-10-01", end: "2026-04-15" }
 
 paths:
-  db: "data/processed/nba_build_run.duckdb"
+  # Use absolute path to existing DB (e.g. main project); or relative for local data/processed
+  db: "C:/Users/tmaku/OneDrive/Documents/GSU/Advanced Machine Learning/NBA Playoff Strentgh Project/data/processed/nba_build.duckdb"
   raw: "data/raw"
   processed: "data/processed"
   outputs: "outputs3"
@@ -30,13 +31,14 @@ repro:
   seed: 42
 
 model_a:
-  stat_dim: 24  # 18 (L10/L30 base) + 2 on_off + pct_min_returning + minutes_share + starter_flag + rank_feature
+  stat_dim: 21  # 18 (L10+L30 incl ts_pct, usage) + 2 (on_court_pm_approx L10/L30) + 1 (pct_min_returning)
   num_embeddings: 500
   embedding_dim: 32
   encoder_hidden: [128, 64]
   attention_heads: 4
   dropout: 0.2
-  learning_rate: 0.001
+  learning_rate: 0.0001
+  grad_clip_max_norm: 5.0  # looser than 1.0 to avoid zero effective gradients when norm is large
   epochs: 28
   early_stopping_patience: 0
   early_stopping_min_delta: 0.0
@@ -44,18 +46,8 @@ model_a:
   minutes_bias_weight: 0.3
   minutes_sum_min: 1.0e-6
   attention_debug: true
-  lr_warmup_steps: 3
   # When raw attention collapses (nearly zero on valid positions): "minutes" or "uniform"
   attention_fallback_strategy: "minutes"
-  attention:
-    temperature: 1.0
-    input_dropout: 0.0
-    entropy_weight: 0.0
-    head_diversity_weight: 0.0
-    grad_clip: 0.0
-    minutes_bias_warmup_epochs: 0
-    use_pre_norm: true
-    use_residual: true
 
 model_b:
   xgb:
@@ -146,15 +138,15 @@ logging:
   playoff_debug: false
 
 # Hyperparameter sweep (scripts/sweep_hparams.py)
-# Expanded robust ranges beyond refined sweep; tests all models including clone classifier.
+# Smaller default grid for feasible full runs; use --phase phase1_xgb or phase2_rf for phased grids, or expand lists for full grid.
 sweep:
-  model_a_epochs: [8, 16, 24, 28]
-  rolling_windows: [[5, 10], [10, 20], [10, 30], [15, 30]]
+  model_a_epochs: [16, 28]
+  rolling_windows: [[10, 30]]
   model_b:
-    max_depth: [3, 4, 5]
-    learning_rate: [0.05, 0.08, 0.10]
-    n_estimators_xgb: [200, 250, 300, 350]
-    n_estimators_rf: [150, 200, 250]
+    max_depth: [3, 4]
+    learning_rate: [0.08]
+    n_estimators_xgb: [250, 300]
+    n_estimators_rf: [200]
     subsample: [0.8]
     colsample_bytree: [0.7]
     min_samples_leaf: [5]
@@ -167,3 +159,5 @@ inference:
   run_id_base: 19
   # If true, also run inference on last train date and write run_id/train_predictions.json
   also_train_predictions: false
+  # If true, inference must use eos_final_rank (playoff-based EOS). Fails if DB has no playoff data (sweep matches baseline).
+  require_eos_final_rank: true

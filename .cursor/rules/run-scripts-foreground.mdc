@@ -1,0 +1,9 @@
+# Run scripts in foreground (project)
+
+When the user says **run the script**, **run sweeps**, or **run the pipeline**:
+
+1. **Foreground only** — Run the command in the foreground. Never run long-running scripts in the background.
+2. **Let run as long as possible** — Use the longest timeout the tool allows so the run is not cut off early (e.g. 1 hour or more for sweeps; follow plan timeouts for pipeline steps).
+3. **Follow the plan** — Use the steps and commands from the relevant plan (e.g. `.cursor/plans/run_full_pipeline_foreground_784ee3ec.plan.md` for pipeline, sweep script for sweeps). Run from project root with PYTHONPATH set; for sweeps use `python -m scripts.sweep_hparams` with the requested options.
+
+If the environment timeout still stops the run before completion, report what completed and give the exact command for the user to run in their terminal to finish.
