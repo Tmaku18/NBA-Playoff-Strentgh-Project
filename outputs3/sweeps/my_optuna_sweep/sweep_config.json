@@ -1,0 +1,9 @@
+{
+  "batch_id": "my_optuna_sweep",
+  "method": "optuna",
+  "n_combos": 30,
+  "n_jobs": 4,
+  "config_outputs": "C:\\Users\\tmaku\\.cursor\\worktrees\\NBA_Playoff_Strentgh_Project\\net\\outputs3",
+  "val_frac": 0.25,
+  "phase": "full"
+}

@@ -1,0 +1,6 @@
+{
+  "batch_id": "optuna_3trial",
+  "method": "optuna",
+  "n_combos": 3,
+  "config_outputs": "C:\\Users\\tmaku\\.cursor\\worktrees\\NBA_Playoff_Strentgh_Project\\net\\outputs3"
+}
