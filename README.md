@@ -75,7 +75,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 2. **Config:** Edit `config/defaults.yaml` if needed (seasons, paths, model params, `build_db.skip_if_exists`, `inference.run_id`). **DB:** `config.paths.db` should point to a DB with playoff data (`playoff_games`, `playoff_team_game_logs`) for sweeps and `--objective playoff_spearman`. From any worktree, set env `NBA_DB_PATH` to that DB path so the sweep uses it (e.g. the main project DB). **Future runs and sweeps use `outputs3/`** (`config.paths.outputs`). The first run in an empty outputs folder can start at `run_001` (or use `inference.run_id_base`); with `inference.run_id: null` (default) runs auto-increment.
 3. **Data:**  
    - `python -m scripts.1_download_raw` — fetch regular-season and playoff logs via nba_api (writes to `data/raw/`; reuses existing files when present).  
-   - `python -m scripts.2_build_db` — build DuckDB from raw → `data/processed/nba_build_run.duckdb`, update `data/manifest.json`. If `build_db.skip_if_exists: true` (default) and the DB file already exists, the build is skipped to keep the current DB.
+   - `python -m scripts.2_build_db` — build DuckDB from raw → path in `config.paths.db` (e.g. `nba_build.duckdb`), update `data/manifest.json`. If `build_db.skip_if_exists: true` (default) and the DB file already exists, the build is skipped to keep the current DB.
 4. **Training (real DB):**  
    - `python -m scripts.3_train_model_a` — K-fold OOF → outputs dir `oof_model_a.parquet`, then final model → `best_deep_set.pt`.  
    - `python -m scripts.4_train_model_b` — K-fold OOF → outputs dir `oof_model_b.parquet`, then XGB + RF → `xgb_model.joblib`, `rf_model.joblib`.  
@@ -89,6 +89,11 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 **Optional:** `python -m scripts.run_manifest` (run manifest); `python -m scripts.run_leakage_tests` (before training); `python -m scripts.1b_download_injuries` (stub for injury data); `python -m scripts.1c_download_raptor` (RAPTOR CSV from FiveThirtyEight).
 
 **Pipeline behavior:** Script 1 reuses raw files that already exist (no re-download). Script 2 skips rebuilding the DB when `build_db.skip_if_exists` is true and the DB file exists; set it to false to force a full rebuild from raw. With `inference.run_id: null`, inference writes to the next run folder (run_002, run_003, …) and evaluation uses the latest run.
+
+**Perfect run checklist (workspace or worktree):**
+- **DB:** `config.paths.db` must point to an existing DuckDB with `playoff_games` and `playoff_team_game_logs` (or set `inference.require_eos_final_rank: false` to allow standings-only).
+- **Worktree sweeps:** Set `NBA_DB_PATH` env to the canonical DB path so the sweep uses the main project DB.
+- **Outputs:** All scripts use `config.paths.outputs` (default `outputs3`); scripts 3–6 write models, predictions, and plots there.
 
 **Training notes:** Model A (script 3) subsamples conference-date lists for OOF and final training (`training.max_lists_oof`, `training.max_final_batches`) and `build_lists` subsamples dates (e.g. 200) for speed; use full list set by increasing these in config or adjusting `build_lists`. Configure training length and early stopping with `model_a.epochs`, `model_a.early_stopping_patience`, `model_a.early_stopping_min_delta`, `model_a.early_stopping_val_frac`.
 
@@ -144,6 +149,20 @@ Running in **WSL (Ubuntu)** with GPU vs **Windows** can yield different results 
 ## Recent implementation (Update2)
 
 Implemented per [.cursor/plans/Update2.md](.cursor/plans/Update2.md): **IG batching fix** (Captum auxiliary tensors expanded to match batched inputs); **latest-team roster** (players only on current team as of `as_of_date`); **EOS_global_rank** (1–30) for evaluation/classification; **manifest db_path** stored relative to project root; **conference plot** uses only valid conference ranks (no global fallback); **attention/IG** sanitized so `predictions.json` is valid JSON (`allow_nan=False`); **ensemble agreement** High/Medium/Low with scaled thresholds and handling of missing models; **ensemble_score** percentile reaches 0.0/1.0. Optional: `output.ig_inference_top_k` and `output.ig_inference_steps` control IG in inference outputs.
+
+---
+
+## Planned improvements (next phase)
+
+Planned per [.cursor/plans/centralize_training_config_attention_eval_expansion.plan.md](.cursor/plans/centralize_training_config_attention_eval_expansion.plan.md):
+
+1. **Centralize training loops** — Move core logic (batching, loss, early stopping) into a class-based `BaseTrainer` in `src/training/`. Scripts handle only CLI and orchestration.
+2. **Configuration-driven architecture** — Pass a `ModelAConfig` object to model constructors; save architecture DNA with checkpoints to prevent inference mismatches.
+3. **Attention debugging as integrated hook** — PyTorch hooks or logging callback to monitor attention entropy; auto-restart on collapse when enabled.
+4. **Attention stability metrics** — Track attention variance and entropy across epochs; `train_history.json`; programmatic collapse detection.
+5. **Championship win-rate calibration** — Brier score, ECE, reliability diagram for championship odds vs actual outcomes.
+6. **Comparative explainability (RFX-Fuse)** — Validate DeepSet high-attention players against RFX-Fuse historical archetypes.
+7. **Strength of Schedule (SoS) normalization** — Enable SOS/SRS; add "Net Rating Adjusted for Opponent" feature.
 
 ---
 
