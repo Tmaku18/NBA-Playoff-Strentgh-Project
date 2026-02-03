@@ -355,3 +355,19 @@ This plan implements seven improvements:
 - `.cursor/plans/Plan.md` — project roadmap.
 - `src/models/set_attention.py` — COLLAPSE_THRESHOLD, fallback logic.
 - PyTorch `register_forward_hook` — for attention capture (standard API).
+
+---
+
+## Appendix: Attention Analysis and Hyperparameter Tracking
+
+**Living document:** [docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md](../docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md)
+
+This document provides:
+
+- Detailed walkthrough of the first working inference (run_023) and attention weights
+- Key inferences about what contributes most to winning (star-dominant vs. distributed)
+- **Hyperparameter tracking framework:** params → metrics by model (A, XGB, RF, ensemble)
+- **Conference-specific vs. league-wide:** East NDCG, West NDCG, per-conference attention patterns
+- **Future run template:** Each sweep combo logs best config, metrics, and attention behavior
+
+By project end, the Analysis document will contain a full matrix of: which parameters improve which metric, for which model, with conference breakdowns.

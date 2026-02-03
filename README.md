@@ -23,6 +23,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
 - **Model A training:** epochs configurable via `model_a.epochs` with optional validation-based early stopping (`early_stopping_*` in `defaults.yaml`). Learning rate and gradient clipping are configurable (`model_a.learning_rate`, `model_a.grad_clip_max_norm`). Set attention uses **σReparam** on Q/K/V projections (Zhai et al., [arXiv:2303.06296](https://arxiv.org/abs/2303.06296)) to bound attention logits and reduce entropy collapse.
 - **Model A and attention collapse:** If training stops with "Model A is not learning" (flat loss), see [.cursor/plans/Attention_Report.md](.cursor/plans/Attention_Report.md) for investigation steps, references, and diagnostics. Enable `model_a.attention_debug: true` to log encoder/Z/scores, gradient norms, relevance, and player_stats; try different `learning_rate` or `grad_clip_max_norm` (e.g. 5.0) if flat loss may be due to over-clipping.
+- **Attention analysis:** [docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md](docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md) — walkthrough of Model A attention, first working inference (run_023), key inferences (star-dominant vs. distributed), and a framework for tracking hyperparameters → metrics by model and conference. Updated with each run/sweep for comprehensive analysis by project end.
 - **Season config:** Hard-coded season date ranges in `defaults.yaml` to avoid play-in ambiguity.
 - **Explainability:** SHAP on Model B only; Integrated Gradients or permutation ablation for Model A.
 
@@ -126,6 +127,7 @@ All paths under the configured outputs dir (`outputs3/` for sweeps and new runs;
 - `outputs/clone_classifier_report.json`, `outputs/clone_xgb_classifier.joblib` — clone classifier (script 4c).
 - `outputs/oof_model_a.parquet`, `outputs/oof_model_b.parquet` — OOF from scripts 3 and 4 (Option A: K-fold, real data).
 - `outputs/best_deep_set.pt`, `outputs/xgb_model.joblib`, `outputs/rf_model.joblib` — trained Model A and Model B.
+- `docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md` — Analysis of Model A attention weights: architecture walkthrough, run_023 inferences (star-dominant vs. distributed), hyperparameter/metric tracking framework, conference vs. league-wide. Updated with each run/sweep.
 
 ---
 
@@ -163,6 +165,8 @@ Planned per [.cursor/plans/centralize_training_config_attention_eval_expansion.p
 5. **Championship win-rate calibration** — Brier score, ECE, reliability diagram for championship odds vs actual outcomes.
 6. **Comparative explainability (RFX-Fuse)** — Validate DeepSet high-attention players against RFX-Fuse historical archetypes.
 7. **Strength of Schedule (SoS) normalization** — Enable SOS/SRS; add "Net Rating Adjusted for Opponent" feature.
+
+**Analysis tracking:** [docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md](docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md) is the living document for attention analysis and hyperparameter→metric tracking. Each run/sweep will update it with config, metrics, and attention patterns (conference and league-wide) for comprehensive analysis by project end.
 
 ---
 
