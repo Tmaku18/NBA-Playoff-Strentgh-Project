@@ -325,6 +325,9 @@ def main() -> int:
             )
             if "error" in metrics:
                 print(f"  FAILED: {metrics['error']}", flush=True)
+                if metrics["error"] == "Inference":
+                    print("Sweep aborted: inference failed. Exiting.", flush=True)
+                    sys.exit(1)
                 return float("-inf")
             val = metrics.get(metric_key)
             if val is None:
@@ -415,6 +418,9 @@ def main() -> int:
                 md, lr_v, nx, nr, sub, col, mleaf, include_clone,
                 val_frac=val_frac,
             )
+            if "error" in m and m["error"] == "Inference":
+                print("Sweep aborted: inference failed. Exiting.", flush=True)
+                sys.exit(1)
             val = m.get(halving_metric_key)
             if val is not None and isinstance(val, (int, float)) and math.isfinite(val):
                 round1_results.append((i, c, float(val)))
@@ -434,6 +440,9 @@ def main() -> int:
             )
             rolling_windows, epochs, max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf = rw, ep, md, lr_v, nx, nr, sub, col, mleaf
             if "error" in metrics:
+                if metrics["error"] == "Inference":
+                    print("Sweep aborted: inference failed. Exiting.", flush=True)
+                    sys.exit(1)
                 results.append({
                     "combo": i,
                     "rolling_windows": str(rolling_windows),
@@ -499,6 +508,9 @@ def main() -> int:
                 )
                 if "error" in metrics:
                     print(f"  FAILED at {metrics['error']}", flush=True)
+                    if metrics["error"] == "Inference":
+                        print("Sweep aborted: inference failed. Exiting.", flush=True)
+                        sys.exit(1)
                     results.append({
                         "combo": i,
                         "rolling_windows": str(rolling_windows),
@@ -574,6 +586,11 @@ def main() -> int:
                         metrics = {"error": str(e)}
                     if "error" in metrics:
                         print(f"  combo {i} FAILED at {metrics['error']}", flush=True)
+                        if metrics["error"] == "Inference":
+                            print("Sweep aborted: inference failed. Exiting.", flush=True)
+                            for f in futures:
+                                f.cancel()
+                            sys.exit(1)
                     results.append(_make_result(i, c, metrics))
             # Reorder results by combo index so CSV and summary match combo_0000, combo_0001, ...
             results.sort(key=lambda r: r["combo"])

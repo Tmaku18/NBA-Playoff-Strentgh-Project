@@ -363,11 +363,11 @@ def run_inference_from_db(
         team_id_to_player_ids: dict[int, list[int | None]] = {}
         batches_a: list[dict[str, Any]] = []
         attn_debug = {"teams": 0, "empty_roster": 0, "all_zero": 0, "attn_sum": [], "attn_max": []}
-        if model_a is not None:
-            model_a = model_a.to(device)
+        model_a_dev = model_a.to(device) if model_a is not None else None
+        if model_a_dev is not None:
             batches_a, list_metas = build_batches_from_lists(target_lists, games, tgl, teams, pgl, config, device=device)
             if batches_a:
-                scores_list, attn_list = predict_batches_with_attention(model_a, batches_a, device)
+                scores_list, attn_list = predict_batches_with_attention(model_a_dev, batches_a, device)
                 for i, meta in enumerate(list_metas):
                     if i >= len(attn_list):
                         break
@@ -590,7 +590,7 @@ def run_inference_from_db(
         # Integrated Gradients summary in predictions.json (optional, top-K per conference)
         ig_by_team: dict[int, list[dict[str, Any]]] = {}
         ig_top_k = int(config.get("output", {}).get("ig_inference_top_k", 1))
-        if ig_top_k > 0 and model_a is not None and batches_a and team_id_to_batch:
+        if ig_top_k > 0 and model_a_dev is not None and batches_a and team_id_to_batch:
             try:
                 from src.viz.integrated_gradients import ig_attr, _HAS_CAPTUM
                 if _HAS_CAPTUM:
@@ -614,10 +614,10 @@ def run_inference_from_db(
                             minu = batch["minutes"][:, k, :]
                             msk = batch["key_padding_mask"][:, k, :]
                             with torch.no_grad():
-                                s_check, _, _ = model_a(emb, stats, minu, msk)
+                                s_check, _, _ = model_a_dev(emb, stats, minu, msk)
                             if not torch.isfinite(s_check).all():
                                 continue
-                            attr, _ = ig_attr(model_a, emb, stats, minu, msk, n_steps=ig_steps)
+                            attr, _ = ig_attr(model_a_dev, emb, stats, minu, msk, n_steps=ig_steps)
                             if attr is None or attr.numel() == 0:
                                 continue
                             attr = torch.nan_to_num(attr, nan=0.0, posinf=0.0, neginf=0.0)
