@@ -128,7 +128,7 @@ This document traces the evolution of hyperparameter testing in the NBA True Str
 **Decisions:**
 
 - **Method:** Optuna with default TPE (Tree-structured Parzen Estimator) sampler.
-- **Objectives:** `--objective spearman | ndcg | playoff_spearman | rank_mae`; rank_mae is minimized, others maximized.
+- **Objectives:** `--objective spearman | ndcg4 | ndcg16 | ndcg20 | playoff_spearman | rank_rmse`; rank_rmse is minimized, others maximized. Eval-only (computed but not sweep objectives): ndcg, ndcg10, ndcg12, rank_mae.
 - **Outputs:** `optuna_study.json` (best_value, best_params), `optuna_importances.json` (Fanova parameter importance) for post-hoc analysis.
 - **Usage:** `--method optuna --n-trials N`. Same pipeline per trial; no pruning within a trial (each trial runs full pipeline).
 

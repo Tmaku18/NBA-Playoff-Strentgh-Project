@@ -1,0 +1,19 @@
+{
+  "best_value": 0.4860119724736512,
+  "best_params": {
+    "rolling_windows": [
+      10,
+      30
+    ],
+    "model_a_epochs": 14,
+    "max_depth": 3,
+    "learning_rate": 0.06516391621961129,
+    "n_estimators_xgb": 283,
+    "n_estimators_rf": 228,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_samples_leaf": 4
+  },
+  "n_trials": 6,
+  "objective": "ndcg"
+}

@@ -20,7 +20,14 @@ This document analyzes the Phase 0 baseline exploratory sweeps and compares resu
    - Update the standings vs playoff comparison table.
    - Commit and push to `main` before starting the next sweep.
 
-**Invocation template:**
+### How to speed up sweep time
+
+- **`--n-jobs 4`** — Run 4 trials in parallel; wall time ≈ (trials/4) × per-trial time.
+- **`--n-trials 6`** — Use for Phase 0 exploratory; increase to 20 for Phase 1.
+- **`--no-run-explain`** — Skip SHAP/IG on best combo (~5–10 min saved).
+- **Config caps** — Lower `max_lists_oof` and `max_final_batches` in `baseline_max_features.yaml` for faster Model A training (trade: fewer lists).
+
+**Invocation template:** Valid objectives: `spearman`, `ndcg4`, `ndcg16`, `ndcg20`, `playoff_spearman`, `rank_rmse`.
 ```powershell
 python -m scripts.sweep_hparams --method optuna --n-trials 6 --n-jobs 4 --objective <OBJ> --listmle-target <TARGET> --phase baseline --batch-id <BATCH_ID> --config config/baseline_max_features.yaml
 ```
@@ -173,6 +180,41 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 �
 
 ---
 
+## Sweep 4: baseline_ndcg_playoff_outcome
+
+**Configuration:**
+- **Objective:** ndcg (maximize)
+- **listmle_target:** playoff_outcome (train on EOS playoff result)
+- **Config:** baseline_max_features
+- **Phase:** baseline
+- **n_trials:** 6 planned; 4 completed (combos 4–5 interrupted; results aggregated via `scripts/aggregate_sweep_results.py`)
+
+### Best combo (by ndcg): combo 1
+
+| Param | Value |
+|-------|-------|
+| model_a_epochs | 14 |
+| max_depth | 3 |
+| learning_rate | 0.065 |
+| n_estimators_xgb | 283 |
+| n_estimators_rf | 228 |
+| min_samples_leaf | 4 |
+
+### Best combo metrics
+
+| Metric | baseline_ndcg_playoff_outcome (combo 1) | baseline_ndcg_final_rank (sweep 3) | run_022 |
+|--------|----------------------------------------|------------------------------------|---------|
+| **NDCG** | 0.486 | 0.486 | 0.482 |
+| **NDCG10** | 0.486 | 0.486 | (same as ndcg) |
+| **Spearman** | 0.485 | 0.483 | 0.430 |
+| **playoff_spearman** | 0.504 | 0.511 | 0.461 |
+| **rank_mae_pred_vs_playoff** | 6.80 | 6.93 | 7.53 |
+| **rank_rmse_pred_vs_playoff** | 8.78 | 8.80 | 9.24 |
+
+**Interpretation:** NDCG-optimized playoff target (sweep 4) matches NDCG from sweep 3 (standings) at 0.486. Playoff_spearman slightly lower than sweep 3 (0.504 vs 0.511) but rank_mae better (6.80 vs 6.93). Both ndcg sweeps beat run_022 on all metrics.
+
+---
+
 ## Standings vs playoff target comparison
 
 | Sweep | listmle_target | Best spearman | Best ndcg | Best playoff_spearman | rank_mae |
@@ -180,14 +222,34 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 �
 | baseline_spearman_final_rank | final_rank | 0.492 | 0.483 | 0.499 | 6.80 |
 | baseline_spearman_playoff_outcome | playoff_outcome | **0.512** | 0.483 | **0.513** | **6.67** |
 | baseline_ndcg_final_rank | final_rank | 0.483 | **0.486** | 0.511 | 6.93 |
-| baseline_ndcg_playoff_outcome | playoff_outcome | (pending) | (pending) | (pending) | (pending) |
+| baseline_ndcg_playoff_outcome | playoff_outcome | 0.485 | **0.486** | 0.504 | **6.80** |
 
 ---
 
 ## Conclusions
 
-1. **Standings-trained (sweep 1)** improved over run_022: Spearman, playoff_spearman, rank_mae, rank_rmse.
-2. **Playoff-trained (sweep 2)** improved further over sweep 1: better Spearman, playoff_spearman, rank_mae, rank_rmse.
-3. **NDCG standings (sweep 3)** improved NDCG and playoff_spearman over run_022.
-4. **Hypothesis supported:** Optimizing for playoff outcome produces better metrics than standings when evaluated against playoff rank.
-5. **Next:** Run baseline_ndcg_playoff_outcome to complete Phase 0, then commit and push before Phase 1.
+1. **Phase 0 complete.** All 4 baseline sweeps ran (sweep 4 aggregated from 4/6 combos after interruption).
+2. **Standings-trained (sweep 1)** improved over run_022: Spearman, playoff_spearman, rank_mae, rank_rmse.
+3. **Playoff-trained (sweep 2)** improved further over sweep 1: better Spearman, playoff_spearman, rank_mae, rank_rmse.
+4. **NDCG sweeps (3 and 4)** both reached NDCG 0.486; playoff target tied on NDCG, slightly worse playoff_spearman, better rank_mae.
+5. **Hypothesis supported:** Playoff-optimized training (sweep 2) gives best Spearman and playoff_spearman. NDCG-optimized configs are similar for standings vs playoff target.
+6. **Next:** Phase 1 — full sweeps with narrowed ranges (see phased_sweep_roadmap), starting with `spearman` objective. Consider adding NDCG@12, NDCG@16, NDCG@20 sweeps per hypotheses below.
+
+---
+
+## Hypotheses for NDCG@k sweeps (future phases)
+
+NBA playoff structure (12 guaranteed teams, 16 full field, 20 including play-in zone) motivates sweep objectives:
+
+| Objective | Rationale | Expected outcome |
+|-----------|-----------|------------------|
+| **NDCG@12** | Optimizes rank ordering of the 12 teams guaranteed playoffs (seeds 1–6 per conference). Strongest teams; cares about rank ordering. | **Best at MRR** — most accurate at identifying/ordering lock-in playoff teams. |
+| **NDCG@16** | Aligns with full 16-team playoff field. | **Best at determining who makes the playoffs** — predicts full bracket qualifiers. |
+| **NDCG@20** | Includes play-in zone (seeds 7–10 per conference). | **Best at handling play-in noise** — more tolerant of uncertainty in seeds 7–10. |
+
+**Playoff Spearman vs NDCG@k:**
+
+- Models optimized for **playoff_spearman** may **suffer worse NDCG** but give **better RMSE and MAE**, because playoff Spearman better accounts for team strength across the full ranking.
+- **Hypothesis:** Varying NDCG cutoff (NDCG@12, NDCG@16, NDCG@20) may **beat playoff-spearman-optimized models** on rank_mae/rank_rmse while maintaining or improving NDCG. Worth testing in Phase 1+ sweeps.
+
+See `docs/HYPOTHESIZED_BEST_CONFIG_AND_METRIC_INSIGHTS.md` §3.6 for full rationale.

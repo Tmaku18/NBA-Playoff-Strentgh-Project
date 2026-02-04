@@ -41,15 +41,24 @@ Model A dominates the ensemble on NDCG/Spearman/MRR; Model B has higher Spearman
 
 Standings-trained baseline sweep **outperformed** run_022 (playoff_outcome) on Spearman, playoff_spearman, rank_mae, rank_rmse. Full analysis: `outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md`.
 
+### Phase 0 NDCG baseline results
+
+**Sweep 3 (baseline_ndcg_final_rank):** Best combo (3): epochs 20, max_depth 5, lr 0.092, n_xgb 269, n_rf 167. NDCG 0.486, playoff_spearman 0.511, rank_mae 6.93.
+
+**Sweep 4 (baseline_ndcg_playoff_outcome):** Best combo (1): epochs 14, max_depth 3, lr 0.065, n_xgb 283, n_rf 228. NDCG 0.486, playoff_spearman 0.504, rank_mae 6.80. (4/6 combos aggregated after interruption.)
+
+**Phase 0 summary:** Playoff-optimized spearman (sweep 2) leads on Spearman (0.512) and playoff_spearman (0.513). NDCG sweeps both reached 0.486. Full comparison: `outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md`.
+
 ### Hypothesized (pre-sweep expectations)
 
 | Objective              | Best model (expected) | Rationale                                                                 |
 |------------------------|-----------------------|---------------------------------------------------------------------------|
 | **spearman**           | Ensemble or Model A   | Correlation benefits from stacking; Model A uses ListMLE with relevance. |
-| **ndcg / ndcg10**      | Model A               | ListMLE is a ranking loss; top-heavy NDCG aligns with listwise optimization. |
+| **ndcg4 / ndcg16 / ndcg20** | Model A        | ListMLE is a ranking loss; NDCG@k aligns with listwise optimization (see §3.6). |
 | **playoff_spearman**   | Ensemble or Model A   | Playoff-outcome target should drive playoff alignment; ensemble reduces noise. |
-| **rank_mae**           | Model A               | Rank distance benefits from ListMLE’s explicit rank optimization.        |
-| **rank_rmse**          | Model A               | Same as rank_mae; RMSE penalizes large errors, ListMLE optimizes ordering. |
+| **rank_rmse**          | Model A               | RMSE penalizes large errors; ListMLE optimizes ordering.                  |
+
+*Eval-only (computed but not sweep objectives):* ndcg, ndcg10, ndcg12, rank_mae.
 
 **Standings-target sweep:** If a separate sweep uses `listmle_target: final_rank` (standings) and `--objective playoff_spearman`, the hypothesis is that the best config from that sweep will have *higher* playoff_spearman than the playoff-outcome sweep, because training on standings aligns with the correlation structure of standings vs playoff outcome. Conversely, **playoff-outcome-target sweeps** should yield better ndcg, mrr, mae, and rmse across models, because the optimization target matches the evaluation target.
 
@@ -84,6 +93,21 @@ When sweeps optimize for **NDCG**, **rank_mae**, or **rank_rmse**, Model A is ex
 - **Proving stats matter:** If our best playoff-optimized model outperforms standings vs actual on NDCG, Spearman, MRR, rank_mae, rank_rmse, and Brier, we have evidence that statistical strength estimates matter more than wins and losses for playoff prediction.
 - **Comparative analysis and attention weights** should yield additional insights: per-conference behavior, which features drive Model A, and how Model B/C contribute to the stack.
 
+### 3.6 NDCG@k and playoff structure (hypothesis)
+
+NBA playoff structure motivates different NDCG cutoffs:
+
+| NDCG@k | Rationale | Expected strength |
+|--------|-----------|-------------------|
+| **NDCG@12** | Matches the 12 teams that **guarantee** playoff berths (seeds 1–6 per conference, excluding play-in). These are the strongest teams. Optimizing for NDCG@12 focuses on rank ordering of lock-in playoff teams. | **Best at MRR** — predicts everyone guaranteed to make playoffs; cares about rank ordering of the strongest teams. |
+| **NDCG@16** | Matches the full 16-team playoff field. | **Best at determining who makes the playoffs** — aligns with the full bracket. |
+| **NDCG@20** | Extends beyond the field to include the play-in zone (seeds 7–10 per conference = 8 teams). | **Best at handling play-in noise** — captures the wider “playoff-adjacent” zone and uncertainty of seeds 7–10. |
+
+**Playoff Spearman vs NDCG@k:**
+
+- Models optimized for **playoff_spearman** may **suffer worse NDCG** but give **better RMSE and MAE**, because playoff Spearman better accounts for the strength of teams across the full ranking.
+- **Hypothesis:** By changing the NDCG cutoff (e.g., NDCG@12, NDCG@16, NDCG@20), we may be able to **beat models optimized by playoff_spearman** on rank_mae/rank_rmse while maintaining or improving NDCG. Different k values target different aspects of the playoff structure.
+
 ---
 
 ## 4. Terminology and Script Naming
@@ -109,6 +133,9 @@ When sweeps optimize for **NDCG**, **rank_mae**, or **rank_rmse**, Model A is ex
 |-------------------------|-----------------------------------------------------|------------|
 | NDCG / NDCG@10          | Ranking quality (top-heavy); 1.0 = perfect order   | Higher     |
 | NDCG@4 (final four)     | Same, truncated at top 4                           | Higher     |
+| NDCG@12                 | Top 12 (guaranteed playoff teams); hypothesized best for MRR | Higher     |
+| NDCG@16                 | Full 16-team playoff field; hypothesized best for “who makes playoffs” | Higher     |
+| NDCG@20                 | Top 20 (includes play-in zone); hypothesized best for play-in noise | Higher     |
 | Spearman                | Correlation of pred vs actual rank                 | Higher     |
 | playoff_spearman        | Pred vs playoff outcome rank                       | Higher     |
 | MRR top-2 / top-4       | 1 / (rank of first true top-2 or top-4 team)      | Higher     |
@@ -120,10 +147,11 @@ When sweeps optimize for **NDCG**, **rank_mae**, or **rank_rmse**, Model A is ex
 
 ## 6. Next Steps
 
-1. **Phase 0 (in progress):** Run baseline_spearman_playoff_outcome, baseline_ndcg_final_rank, baseline_ndcg_playoff_outcome. Compare standings vs playoff target.
-2. Run sweeps for each objective: `spearman`, `ndcg`, `ndcg10`, `playoff_spearman`, `rank_mae`, `rank_rmse`.
-3. Populate sweep summaries with `best_by_*` for each metric.
-4. Compare best configs across objectives; validate which model (A, B, C, or ensemble) leads per metric.
-5. Test standings-target vs playoff-target sweeps for playoff_spearman.
-6. Update scripts and eval outputs to use Model B / Model C naming.
-7. Use attention weights and comparative analysis to refine hypotheses and report findings.
+1. **Phase 0 complete.** All 4 baseline sweeps ran. Commit and push outputs.
+2. **Phase 1:** Add `--phase phase1` with narrowed ranges; run full sweeps (20 trials each) for `spearman`, `ndcg4`, `ndcg16`, `ndcg20`, `playoff_spearman`, `rank_rmse` (each with final_rank + playoff_outcome).
+3. **Eval/analytics only** (calculated but not sweep objectives): `ndcg`, `ndcg10`, `ndcg12`, `rank_mae` — appear in eval reports and sweep summaries for analysis.
+4. Populate sweep summaries with `best_by_*` for each metric.
+5. Compare best configs across objectives; validate which model (A, B, C, or ensemble) leads per metric.
+6. Test standings-target vs playoff-target sweeps for playoff_spearman.
+7. Update scripts and eval outputs to use Model B / Model C naming.
+8. Use attention weights and comparative analysis to refine hypotheses and report findings.

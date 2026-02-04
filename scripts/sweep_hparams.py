@@ -7,7 +7,7 @@ No artificial timeout.
 Usage:
   python -m scripts.sweep_hparams [--batch-id BATCH_ID] [--dry-run] [--max-combos N]
   python -m scripts.sweep_hparams [--val-frac FRAC] [--phase full|phase1_xgb|phase2_rf]
-  python -m scripts.sweep_hparams --method optuna [--n-trials N] [--objective spearman|ndcg|playoff_spearman|rank_mae]
+  python -m scripts.sweep_hparams --method optuna [--n-trials N] [--objective spearman|ndcg4|ndcg16|ndcg20|playoff_spearman|rank_rmse]
 
 --method grid: Full grid search (default). Config sweep section is a smaller default grid; expand in config or use --phase for phased grids.
 --method optuna: Bayesian optimization with Optuna; --objective sets the metric to optimize.
@@ -246,8 +246,8 @@ def main() -> int:
         "--objective",
         type=str,
         default="spearman",
-        choices=("spearman", "ndcg", "ndcg10", "playoff_spearman", "rank_mae", "rank_rmse"),
-        help="Optuna: metric to optimize (rank_mae/rank_rmse = minimize; others = maximize). Default spearman.",
+        choices=("spearman", "ndcg4", "ndcg16", "ndcg20", "playoff_spearman", "rank_rmse"),
+        help="Optuna: metric to optimize (rank_rmse = minimize; others = maximize). Default spearman.",
     )
     parser.add_argument("--no-run-explain", action="store_true", help="Skip running 5b_explain on best combo after sweep")
     parser.add_argument("--val-frac", type=float, default=0.25, help="Model A early-stopping validation fraction (default 0.25)")
@@ -255,8 +255,8 @@ def main() -> int:
         "--phase",
         type=str,
         default="full",
-        choices=("full", "phase1_xgb", "phase2_rf", "baseline"),
-        help="full=config grid; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges for exploratory (Optuna only)",
+        choices=("full", "phase1", "phase1_xgb", "phase2_rf", "baseline"),
+        help="full=config grid; phase1=narrowed Optuna ranges for Phase 1; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges for exploratory (Optuna only)",
     )
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
     parser.add_argument(
@@ -332,6 +332,16 @@ def main() -> int:
         subsample_list = [0.8]
         colsample_list = [0.8]
         min_leaf_list = [4, 5, 6]
+    elif phase == "phase1":
+        # Phase 1 (narrowed): from optuna_importances; focus on high-impact params
+        epochs_list = list(range(14, 27))  # 14-26
+        max_depth_list = [3, 4, 5]
+        lr_list = [0.06, 0.08, 0.10]
+        n_xgb_list = list(range(200, 301))  # 200-300
+        n_rf_list = list(range(150, 231))  # 150-230
+        subsample_list = [0.8]
+        colsample_list = [0.7]
+        min_leaf_list = [4, 5, 6]
     elif phase == "baseline":
         # Phase 0 (baseline): wide ranges for exploratory sweeps; smallest combo covering widest range
         epochs_list = list(range(8, 29))  # 8-28
@@ -349,14 +359,14 @@ def main() -> int:
         import optuna
         _OBJECTIVE_KEYS = {
             "spearman": "test_metrics_ensemble_spearman",
-            "ndcg": "test_metrics_ensemble_ndcg",
-            "ndcg10": "test_metrics_ensemble_ndcg10",
+            "ndcg4": "test_metrics_ensemble_ndcg_at_4",
+            "ndcg16": "test_metrics_ensemble_ndcg_at_16",
+            "ndcg20": "test_metrics_ensemble_ndcg_at_20",
             "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank",
-            "rank_mae": "test_metrics_ensemble_rank_mae_pred_vs_playoff",
             "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff",
         }
         metric_key = _OBJECTIVE_KEYS[args.objective]
-        direction = "minimize" if args.objective in ("rank_mae", "rank_rmse") else "maximize"
+        direction = "minimize" if args.objective == "rank_rmse" else "maximize"
 
         def objective(trial: "optuna.Trial") -> float:
             rolling_windows = trial.suggest_categorical("rolling_windows", [tuple(x) for x in rolling_list])
@@ -429,7 +439,7 @@ def main() -> int:
                 )
         except Exception as e:
             print(f"Warning: could not compute Optuna importances: {e}", flush=True)
-        actual_best = -study.best_value if args.objective == "rank_mae" else study.best_value
+        actual_best = -study.best_value if args.objective == "rank_rmse" else study.best_value
         print(f"Optuna best {metric_key}={actual_best:.4f} (objective={args.objective}) params={study.best_params}", flush=True)
     elif args.method == "halving":
         combos = list(itertools.product(
@@ -668,7 +678,11 @@ def main() -> int:
     # Summary: best by spearman, ndcg, rank_mae (lower is better), etc. (grid) or by value (optuna)
     ensemble_key = "test_metrics_ensemble_spearman"
     ndcg_key = "test_metrics_ensemble_ndcg"
+    ndcg4_key = "test_metrics_ensemble_ndcg_at_4"
     ndcg10_key = "test_metrics_ensemble_ndcg10"
+    ndcg12_key = "test_metrics_ensemble_ndcg_at_12"
+    ndcg16_key = "test_metrics_ensemble_ndcg_at_16"
+    ndcg20_key = "test_metrics_ensemble_ndcg_at_20"
     rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff"
     rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff"
     playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank"
@@ -686,11 +700,35 @@ def main() -> int:
         and isinstance(r.get(rank_rmse_key), (int, float))
         and math.isfinite(r.get(rank_rmse_key))
     ]
+    valid_ndcg4 = [
+        r for r in results
+        if ndcg4_key in r
+        and isinstance(r.get(ndcg4_key), (int, float))
+        and math.isfinite(r.get(ndcg4_key))
+    ]
     valid_ndcg10 = [
         r for r in results
         if ndcg10_key in r
         and isinstance(r.get(ndcg10_key), (int, float))
         and math.isfinite(r.get(ndcg10_key))
+    ]
+    valid_ndcg12 = [
+        r for r in results
+        if ndcg12_key in r
+        and isinstance(r.get(ndcg12_key), (int, float))
+        and math.isfinite(r.get(ndcg12_key))
+    ]
+    valid_ndcg16 = [
+        r for r in results
+        if ndcg16_key in r
+        and isinstance(r.get(ndcg16_key), (int, float))
+        and math.isfinite(r.get(ndcg16_key))
+    ]
+    valid_ndcg20 = [
+        r for r in results
+        if ndcg20_key in r
+        and isinstance(r.get(ndcg20_key), (int, float))
+        and math.isfinite(r.get(ndcg20_key))
     ]
     valid_playoff = [
         r for r in results
@@ -704,9 +742,21 @@ def main() -> int:
         best_ndcg = max(valid, key=lambda x: float(x.get(ndcg_key, -1)))
         summary["best_by_spearman"] = best_sp
         summary["best_by_ndcg"] = best_ndcg
+    if valid_ndcg4:
+        best_ndcg4 = max(valid_ndcg4, key=lambda x: float(x.get(ndcg4_key, -1)))
+        summary["best_by_ndcg4"] = best_ndcg4
     if valid_ndcg10:
         best_ndcg10 = max(valid_ndcg10, key=lambda x: float(x.get(ndcg10_key, -1)))
         summary["best_by_ndcg10"] = best_ndcg10
+    if valid_ndcg12:
+        best_ndcg12 = max(valid_ndcg12, key=lambda x: float(x.get(ndcg12_key, -1)))
+        summary["best_by_ndcg12"] = best_ndcg12
+    if valid_ndcg16:
+        best_ndcg16 = max(valid_ndcg16, key=lambda x: float(x.get(ndcg16_key, -1)))
+        summary["best_by_ndcg16"] = best_ndcg16
+    if valid_ndcg20:
+        best_ndcg20 = max(valid_ndcg20, key=lambda x: float(x.get(ndcg20_key, -1)))
+        summary["best_by_ndcg20"] = best_ndcg20
     if valid_mae:
         best_mae = min(valid_mae, key=lambda x: float(x.get(rank_mae_key, float("inf"))))
         summary["best_by_rank_mae"] = best_mae

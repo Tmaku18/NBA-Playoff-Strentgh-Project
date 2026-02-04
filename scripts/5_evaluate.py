@@ -128,11 +128,15 @@ def _compute_metrics_from_arrays(
     """Compute ndcg, spearman, mrr, roc_auc_upset from arrays."""
     n = len(y_actual)
     if n < 2:
-        return {"ndcg": 0.0, "ndcg10": 0.0, "spearman": 0.0, "mrr_top2": 0.0, "mrr_top4": 0.0, "roc_auc_upset": 0.5}
+        return {"ndcg": 0.0, "ndcg10": 0.0, "ndcg_at_4": 0.0, "ndcg_at_12": 0.0, "ndcg_at_16": 0.0, "ndcg_at_20": 0.0, "spearman": 0.0, "mrr_top2": 0.0, "mrr_top4": 0.0, "roc_auc_upset": 0.5}
     max_rank = int(np.max(y_actual)) if n else 0
     y_true_relevance = (max_rank - y_actual + 1).clip(1, max_rank if max_rank > 0 else 1)
     m = evaluate_ranking(y_true_relevance, y_score, k=min(k, n))
     m["ndcg10"] = m["ndcg"]  # ndcg already uses k=10; explicit key for clarity
+    m["ndcg_at_4"] = float(ndcg_score(y_true_relevance, y_score, k=min(4, n)))
+    m["ndcg_at_12"] = float(ndcg_score(y_true_relevance, y_score, k=min(12, n)))
+    m["ndcg_at_16"] = float(ndcg_score(y_true_relevance, y_score, k=min(16, n)))
+    m["ndcg_at_20"] = float(ndcg_score(y_true_relevance, y_score, k=min(20, n)))
     delta = y_actual - pred_ranks_arr
     y_bin = (delta > 0).astype(np.float32)
     if np.unique(y_bin).size >= 2:

@@ -1,7 +1,19 @@
 ---
 name: Phased Sweep Roadmap 3hr
 overview: Phase 0 baseline sweeps (spearman, ndcg; standings + playoff; max features; minimal trials) to find promising ranges, then phased Optuna sweeps with 4 parallel jobs under 3 hours per objective batch.
-todos: []
+todos:
+  - id: phase0-done
+    content: Phase 0 baseline sweeps complete (4/4)
+    status: completed
+  - id: phase1-spearman
+    content: Phase 1 spearman sweeps (final_rank + playoff_outcome, 20 trials each)
+    status: pending
+  - id: phase1-ndcg
+    content: Phase 1 ndcg4, ndcg16, ndcg20 sweeps (final_rank + playoff_outcome, 20 trials each)
+    status: pending
+  - id: phase1-remaining
+    content: Phase 1 playoff_spearman, rank_rmse sweeps
+    status: pending
 isProject: false
 ---
 
@@ -9,7 +21,34 @@ isProject: false
 
 ---
 
-## Phase 0: Baseline Exploratory Sweeps (BEFORE Phase 1)
+## Phase 0: COMPLETE (2025-02)
+
+All 4 baseline sweeps ran. See [outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md](outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md).
+
+| Sweep | Status | Best ndcg | Best spearman | Best playoff_spearman |
+|-------|--------|-----------|---------------|-----------------------|
+| baseline_spearman_final_rank | Done | 0.483 | 0.492 | 0.499 |
+| baseline_spearman_playoff_outcome | Done | 0.483 | **0.512** | **0.513** |
+| baseline_ndcg_final_rank | Done | 0.486 | 0.483 | 0.511 |
+| baseline_ndcg_playoff_outcome | Done (4/6 combos aggregated) | 0.486 | 0.485 | 0.504 |
+
+**Phase 1 ranges (from optuna_importances):** Fix subsample, rolling_windows, colsample_bytree at default. Focus on: learning_rate, min_samples_leaf, n_estimators_rf, n_estimators_xgb, model_a_epochs, max_depth.
+
+### Next steps (roadmap)
+
+1. **Commit and push** Phase 0 outputs (BASELINE_SWEEP_ANALYSIS.md, baseline_ndcg_playoff_outcome sweep results, aggregate script).
+2. **Add `--phase phase1`** to sweep_hparams with narrowed Optuna ranges (epochs 14–26, max_depth 3–5, lr 0.06–0.10, n_xgb 200–300, n_rf 150–230, min_leaf 4–6).
+3. **Run Phase 1 spearman** (first objective):
+   - `phase1_spearman_final_rank` — 20 trials, n_jobs 4, foreground, no timeout
+   - Analyze; update docs
+   - `phase1_spearman_playoff_outcome` — same
+   - Analyze; update docs
+4. **Run Phase 1 ndcg** (second objective) — same pattern.
+5. **Continue** with ndcg4, ndcg16, ndcg20, playoff_spearman, rank_rmse per timing map.
+
+---
+
+## Phase 0: Baseline Exploratory Sweeps (reference)
 
 **Goal:** Run 2 baseline sweeps each for **spearman** and **ndcg**, evaluating against both **end-of-playoff rank** and **playoff standings**, with **max player features** and the **smallest combination of hyperparameters** that covers the **widest range possible** — to decide where to start full sweeps.
 
@@ -135,9 +174,10 @@ Per [docs/HYPERPARAMETER_TESTING_EVOLUTION.md](docs/HYPERPARAMETER_TESTING_EVOLU
 
 ## Sweep Structure
 
-### Objectives (6)
+### Objectives (sweep optimization)
 
-- `spearman`, `ndcg`, `ndcg10`, `playoff_spearman`, `rank_mae`, `rank_rmse`
+- `spearman`, `ndcg4`, `ndcg16`, `ndcg20`, `playoff_spearman`, `rank_rmse`
+- **Eval/analytics only** (calculated but not sweep objectives): `ndcg`, `ndcg10`, `ndcg12`, `rank_mae`
 
 ### ListMLE Target (2 per objective)
 
@@ -160,10 +200,10 @@ Per [docs/HYPERPARAMETER_TESTING_EVOLUTION.md](docs/HYPERPARAMETER_TESTING_EVOLU
 | Objective        | Sweep 1 (final_rank) | Analysis | Sweep 2 (playoff_outcome) | Analysis | Total       |
 | ---------------- | -------------------- | -------- | ------------------------- | -------- | ----------- |
 | spearman         | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
-| ndcg             | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
-| ndcg10           | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
+| ndcg4            | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
+| ndcg16           | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
+| ndcg20           | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
 | playoff_spearman | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
-| rank_mae         | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
 | rank_rmse        | 75 min               | 15 min   | 75 min                    | 15 min   | **180 min** |
 
 
@@ -241,6 +281,32 @@ Same pattern for `ndcg`, `ndcg10`, `playoff_spearman`, `rank_mae`, `rank_rmse`.
 
 ---
 
+## How to speed up sweeps
+
+| Tactic | Effect | Trade-off |
+|--------|--------|-----------|
+| **`--n-jobs 4`** | Wall time ≈ trials/n_jobs × per-trial time (e.g. 20 trials × 15 min / 4 → ~75 min) | Memory scales with workers; need stable DB/disk |
+| **`--n-trials 6`** | Exploratory sweeps finish in ~30 min (with n_jobs=4) | Fewer samples; use for Phase 0, increase to 20 for Phase 1 |
+| **`--phase baseline`** | Wide ranges, few trials; quick exploration | Less coverage; narrow ranges for follow-up |
+| **`--no-run-explain`** | Skip SHAP/IG on best combo; saves ~5–10 min per sweep | No explain artifacts for best config |
+| **Lower max_lists_oof, max_final_batches** | Faster Model A training (e.g. 50 vs 100) | Fewer lists processed; may affect quality |
+
+---
+
+## NDCG@k Hypotheses (sweep objectives)
+
+Per NBA playoff structure and [docs/HYPOTHESIZED_BEST_CONFIG_AND_METRIC_INSIGHTS.md](docs/HYPOTHESIZED_BEST_CONFIG_AND_METRIC_INSIGHTS.md) §3.6:
+
+| Sweep objective | Rationale                                              | Expected strength                    |
+|-----------------|--------------------------------------------------------|--------------------------------------|
+| **ndcg4**       | Final four; top-heavy ranking                          | Best at MRR (champion/runner-up)     |
+| **ndcg16**      | Full 16-team playoff field                             | Best at “who makes playoffs”         |
+| **ndcg20**      | Includes play-in zone (seeds 7–10)                      | Best at handling play-in noise       |
+
+**Eval/analytics only** (calculated but not sweep objectives): ndcg, ndcg10, ndcg12, rank_mae.
+
+---
+
 ## Phase 2 Planning (after Phase 1)
 
 After one sweep per (objective, listmle_target):
@@ -253,6 +319,7 @@ After one sweep per (objective, listmle_target):
   - Narrow search space for Phase 2 (e.g. fix low-importance params)
   - Prioritize objectives that showed most gain
   - Optionally run Phase 2 with `--phase phase1_xgb` or `phase2_rf` for focused Model B tuning
+  - Consider NDCG@4, NDCG@16, NDCG@20 sweeps per hypotheses above
 3. **Document**
   - Create `PHASE2_SWEEP_PLAN.md` in `.cursor/plans/` with updated ranges and objectives
 
