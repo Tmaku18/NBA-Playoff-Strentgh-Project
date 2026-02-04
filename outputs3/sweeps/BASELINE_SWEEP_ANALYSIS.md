@@ -4,6 +4,29 @@ This document analyzes the Phase 0 baseline exploratory sweeps and compares resu
 
 ---
 
+## Sweep Workflow Rules (consistency and visibility)
+
+1. **Before beginning a sweep**
+   - Ensure `outputs3/sweeps/` is tracked by Git and pushed to `main` (sweep results, BASELINE_SWEEP_ANALYSIS.md, optuna_*, sweep_*).
+   - Confirm no uncommitted changes that would be overwritten.
+
+2. **Sweep execution**
+   - Run in **foreground** (never background).
+   - Use **n_jobs=4** (4 parallel workers).
+   - Use **no timeout** â€” let the sweep run until completion.
+
+3. **After each sweep**
+   - Update this document with results, best combo, and interpretation.
+   - Update the standings vs playoff comparison table.
+   - Commit and push to `main` before starting the next sweep.
+
+**Invocation template:**
+```powershell
+python -m scripts.sweep_hparams --method optuna --n-trials 6 --n-jobs 4 --objective <OBJ> --listmle-target <TARGET> --phase baseline --batch-id <BATCH_ID> --config config/baseline_max_features.yaml
+```
+
+---
+
 ## Sweep 1: baseline_spearman_final_rank
 
 **Configuration:**
@@ -114,14 +137,50 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 â
 
 ---
 
+## Sweep 3: baseline_ndcg_final_rank
+
+**Configuration:**
+- **Objective:** ndcg (maximize)
+- **listmle_target:** final_rank (train on EOS standings)
+- **Config:** baseline_max_features
+- **Phase:** baseline
+- **n_trials:** 6
+- **n_jobs:** 4
+
+### Best combo (by ndcg): combo 3
+
+| Param | Value |
+|-------|-------|
+| model_a_epochs | 20 |
+| max_depth | 5 |
+| learning_rate | 0.092 |
+| n_estimators_xgb | 269 |
+| n_estimators_rf | 167 |
+| min_samples_leaf | 6 |
+
+### Best combo metrics
+
+| Metric | baseline_ndcg_final_rank (combo 3) | run_022 |
+|--------|------------------------------------|---------|
+| **NDCG** | 0.486 | 0.482 |
+| **NDCG10** | 0.486 | (same as ndcg) |
+| **Spearman** | 0.483 | 0.430 |
+| **playoff_spearman** | 0.511 | 0.461 |
+| **rank_mae_pred_vs_playoff** | 6.93 | 7.53 |
+| **rank_rmse_pred_vs_playoff** | 8.80 | 9.24 |
+
+**Interpretation:** Optimizing for NDCG with standings target improved NDCG (+0.004) and playoff_spearman (+0.05) over run_022. Similar rank_mae/rmse gains to spearman sweeps.
+
+---
+
 ## Standings vs playoff target comparison
 
-| Sweep | listmle_target | Best spearman | Best playoff_spearman | rank_mae |
-|-------|----------------|---------------|-----------------------|----------|
-| baseline_spearman_final_rank | final_rank | 0.492 | 0.499 | 6.80 |
-| baseline_spearman_playoff_outcome | playoff_outcome | **0.512** | **0.513** | **6.67** |
-| baseline_ndcg_final_rank | final_rank | (pending) | (pending) | (pending) |
-| baseline_ndcg_playoff_outcome | playoff_outcome | (pending) | (pending) | (pending) |
+| Sweep | listmle_target | Best spearman | Best ndcg | Best playoff_spearman | rank_mae |
+|-------|----------------|---------------|-----------|-----------------------|----------|
+| baseline_spearman_final_rank | final_rank | 0.492 | 0.483 | 0.499 | 6.80 |
+| baseline_spearman_playoff_outcome | playoff_outcome | **0.512** | 0.483 | **0.513** | **6.67** |
+| baseline_ndcg_final_rank | final_rank | 0.483 | **0.486** | 0.511 | 6.93 |
+| baseline_ndcg_playoff_outcome | playoff_outcome | (pending) | (pending) | (pending) | (pending) |
 
 ---
 
@@ -129,5 +188,6 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 â
 
 1. **Standings-trained (sweep 1)** improved over run_022: Spearman, playoff_spearman, rank_mae, rank_rmse.
 2. **Playoff-trained (sweep 2)** improved further over sweep 1: better Spearman, playoff_spearman, rank_mae, rank_rmse.
-3. **Hypothesis supported:** Optimizing for playoff outcome produces better metrics than standings when evaluated against playoff rank.
-4. **Next:** Run baseline_ndcg_final_rank and baseline_ndcg_playoff_outcome to complete Phase 0.
+3. **NDCG standings (sweep 3)** improved NDCG and playoff_spearman over run_022.
+4. **Hypothesis supported:** Optimizing for playoff outcome produces better metrics than standings when evaluated against playoff rank.
+5. **Next:** Run baseline_ndcg_playoff_outcome to complete Phase 0, then commit and push before Phase 1.

@@ -18,6 +18,7 @@ outputs2/run_022/*
 outputs3/*
 !outputs3/.gitkeep
 !outputs3/sweeps/
+!outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md
 !outputs3/sweeps/*/
 outputs3/sweeps/*/*
 !outputs3/sweeps/*/sweep_results.csv
