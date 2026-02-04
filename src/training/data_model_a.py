@@ -173,6 +173,8 @@ def build_batches_from_db(
     config: dict,
     *,
     device: torch.device | str = "cpu",
+    playoff_games: pd.DataFrame | None = None,
+    playoff_tgl: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     """
     Build ListMLE batches from DB data. Each batch = one conference-date list:
@@ -180,11 +182,17 @@ def build_batches_from_db(
     
     If training.use_prior_season_baseline is true, players with all-zero stats will have
     their stats filled from prior season averages.
+    playoff_games, playoff_tgl: required when listmle_target=playoff_outcome.
     """
     if pgl.empty or tgl.empty or games.empty:
         return []
 
-    lists = build_lists(tgl, games, teams, config=config)
+    lists = build_lists(
+        tgl, games, teams,
+        config=config,
+        playoff_games=playoff_games,
+        playoff_tgl=playoff_tgl,
+    )
     ma = config.get("model_a", {})
     training_cfg = config.get("training", {})
     num_emb = ma.get("num_embeddings", 500)

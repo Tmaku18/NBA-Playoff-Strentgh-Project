@@ -116,6 +116,13 @@ Primary evaluation focuses on ranking + predictive quality:
 
 No MAE on Net Rating; no efficiency alignment metric in evaluation. Net Rating is **not** a model target or evaluation metric; it may be used only in baselines (e.g. rank-by-Net-Rating, Dummy).
 
+### 4.1 Target comparison and validation
+
+- We will test targeting **both** `playoff_outcome` and `final_rank` (standings) in sweeps or dedicated runs.
+- For **standings**, results will show relevance or irrelevance (e.g., if standings-targeted model underperforms vs playoff outcome).
+- **Hypothesis:** Playoff-outcome target will be more accurate than standings consistently for playoff-relevant metrics (Spearman vs playoff rank, NDCG@4).
+- **Final report:** Will calculate confidence levels (e.g., bootstrap CIs on Spearman/NDCG) and use statistical tests to demonstrate that the model's performance is above chance / baselines.
+
 ---
 
 ## 5. Explainability and Validation

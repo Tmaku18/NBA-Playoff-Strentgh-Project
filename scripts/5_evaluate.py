@@ -374,6 +374,13 @@ def main():
             "rank_mae/rank_rmse: mean absolute and root mean squared error of rank vs actual EOS playoff rank (pred and standings baselines)."
         )
 
+    # Write to run_dir to preserve per-run (never overwrite previous run's report)
+    run_report_path = run_dir / "eval_report.json"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    with open(run_report_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
+    print(f"Wrote {run_report_path}")
+    # Also write to outputs root for "latest" (backward compatibility)
     out = out_dir / "eval_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:

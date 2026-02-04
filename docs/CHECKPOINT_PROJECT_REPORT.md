@@ -24,7 +24,7 @@ This project builds a multi-modal stacking ensemble to predict NBA team strength
 
 - **Target:** Future W/L (next 5) or final playoff seed — never raw efficiency metrics as the primary target.
 - **No net-rating leakage:** `net_rating` is excluded from Model B features and from targets; enforced in `src.features.team_context.FORBIDDEN` and training code. Allowed only in baselines (e.g. rank-by-Net-Rating).
-- **ListMLE for Model A:** Listwise ranking loss over conference-date lists; teams in a list are ranked by strength; ListMLE encourages correct ordering of teams within each list.
+- **ListMLE for Model A:** Listwise ranking loss over conference-date lists; teams in a list are ranked by strength; ListMLE encourages correct ordering of teams within each list. Model A ListMLE target = **playoff outcome** (`eos_final_rank`, champion=1) when `listmle_target: playoff_outcome`. Fallback to standings for seasons without playoff data. Previously `final_rank` (EOS standings); now `playoff_outcome`.
 - **RidgeCV for stacking:** Level-2 meta-learner is RidgeCV on pooled OOF (not Logistic Regression) for stability and to avoid overfitting when blending Model A, XGB, and RF ranks.
 - **Evaluation target evolution:** Early runs (009–017) used **regular-season standings** (or snapshot order) as ground truth. Later runs (020, 021) use **playoff outcome** (`eos_final_rank`: champion=1, runner-up=2, … first two eliminated=29–30). Metrics are **not comparable** across these two target types.
 

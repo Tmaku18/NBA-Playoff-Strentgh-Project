@@ -93,7 +93,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 
 **Perfect run checklist (workspace or worktree):**
 - **DB:** `config.paths.db` must point to an existing DuckDB with `playoff_games` and `playoff_team_game_logs` (or set `inference.require_eos_final_rank: false` to allow standings-only).
-- **Worktree sweeps:** Set `NBA_DB_PATH` env to the canonical DB path so the sweep uses the main project DB.
+- **Worktree / playoff plots:** Set `NBA_DB_PATH` env to the canonical DB path so inference (script 6) and sweep both use the DB that has playoff data (produces `eos_playoff_standings_vs_eos_global_rank.png`).
 - **Outputs:** All scripts use `config.paths.outputs` (default `outputs3`); scripts 3–6 write models, predictions, and plots there.
 
 **Training notes:** Model A (script 3) subsamples conference-date lists for OOF and final training (`training.max_lists_oof`, `training.max_final_batches`) and `build_lists` subsamples dates (e.g. 200) for speed; use full list set by increasing these in config or adjusting `build_lists`. Configure training length and early stopping with `model_a.epochs`, `model_a.early_stopping_patience`, `model_a.early_stopping_min_delta`, `model_a.early_stopping_val_frac`.
@@ -105,7 +105,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - [ ] **Time rule:** All features use only rows with `game_date < as_of_date` (strict t-1). Rolling stats use `shift(1)` before aggregation.
 - [ ] **Roster:** Minutes and roster selection use only games before `as_of_date`. Rosters use a **latest-team** map (player’s most recent team as of `as_of_date`) so traded players appear only on their current team; season boundaries from config scope games when building rosters.
 - [ ] **Model B:** Feature set must **not** include `net_rating`. Enforced in `src.features.team_context.FORBIDDEN` and `train_model_b`.
-- [ ] **ListMLE:** Targets configurable: `listmle_target: final_rank` (EOS_playoff_standings) or `standings` (win-rate to date). Evaluation remains season-end.
+- [ ] **ListMLE:** Targets configurable: `listmle_target: playoff_outcome` (EOS playoff result, champion=1), `final_rank` (EOS standings), or `standings` (win-rate to date). As of Feb 2025, default is `playoff_outcome`. Plans specify future A/B testing of both targets. Evaluation remains season-end.
 - [ ] **Baselines only:** Net Rating is used only in `rank-by-Net-Rating` baseline, computed from off/def ratings, never as a model input.
 
 ---

@@ -67,7 +67,7 @@ training:
   rolling_windows: [10, 30]
   roster_size: 15
   target_rank: "playoffs"  # or "standings" to train meta on standings-to-date
-  listmle_target: "final_rank"  # ListMLE train target: "final_rank" (EOS_playoff_standings) or "standings" (win-rate to date)
+  listmle_target: "playoff_outcome"  # "playoff_outcome"=EOS playoff result (champion=1); "final_rank"=EOS standings; "standings"=win-rate to date
   # 75/25 train-test split (script 3 writes split_info.json; 4 and 6 read it)
   train_seasons: ["2015-16", "2016-17", "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23"]
   test_seasons: ["2023-24", "2024-25"]
@@ -156,10 +156,10 @@ sweep:
 
 # null = auto-increment run (run_002, run_003, ... from existing run_* dirs); set e.g. "run_001" to fix
 inference:
-  run_id: null
+  run_id: run_023
   # When outputs dir has no run_* subdirs, use this as first run (e.g. 19 -> run_019)
-  run_id_base: 19
+  run_id_base: 23
   # If true, also run inference on last train date and write run_id/train_predictions.json
   also_train_predictions: false
   # If true, inference must use eos_final_rank (playoff-based EOS). Fails if DB has no playoff data (sweep matches baseline).
-  require_eos_final_rank: true
+  require_eos_final_rank: false

@@ -1,3 +1,0 @@
-colsample_bytree,combo,epochs,error,learning_rate,max_depth,min_samples_leaf,n_rf,n_xgb,rolling_windows,subsample
-0.7,0,8,Inference,0.05,3,5,150,200,"[5, 10]",0.8
-0.7,1,8,Inference,0.05,3,5,200,200,"[5, 10]",0.8

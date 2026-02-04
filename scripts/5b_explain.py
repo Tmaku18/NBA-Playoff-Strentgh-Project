@@ -18,6 +18,24 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
+def _copy_to_run_dir(out: Path, src: Path, name: str, config: dict) -> None:
+    """Copy explain output to run_dir to preserve per-run when run_id is known."""
+    import re
+    run_id = config.get("inference", {}).get("run_id")
+    if run_id is None or (isinstance(run_id, str) and run_id.strip().lower() in ("null", "")):
+        current_run = out / ".current_run"
+        if current_run.exists():
+            run_id = current_run.read_text(encoding="utf-8").strip()
+    if run_id and re.match(r"^run_\d+$", run_id, re.I):
+        run_dir = out / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        dst = run_dir / name
+        if src.exists():
+            import shutil
+            shutil.copy2(src, dst)
+            print("Wrote", dst)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Explain Model B (SHAP) and Model A (attention/IG)")
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML; default: config/defaults.yaml")
@@ -78,8 +96,11 @@ def main():
         import joblib
         from src.viz.shap_summary import shap_summary
         rf = joblib.load(rf_path)
-        shap_summary(rf, X_real, feature_names=feat_cols, out_path=out / "shap_summary.png")
-        print("Wrote", out / "shap_summary.png")
+        shap_path = out / "shap_summary.png"
+        shap_summary(rf, X_real, feature_names=feat_cols, out_path=shap_path)
+        print("Wrote", shap_path)
+        # Preserve in run_dir when run_id known (e.g. pipeline)
+        _copy_to_run_dir(out, shap_path, "shap_summary.png", config)
     except Exception as e:
         print("SHAP failed:", e, file=sys.stderr)
         sys.exit(1)
@@ -163,6 +184,7 @@ def main():
                             ig_path = out / "ig_model_a_attributions.txt"
                             ig_path.write_text(summary, encoding="utf-8")
                             print("Wrote", ig_path)
+                            _copy_to_run_dir(out, ig_path, "ig_model_a_attributions.txt", config)
                         else:
                             print("Integrated Gradients: no attributions (empty result).")
                 except ImportError:

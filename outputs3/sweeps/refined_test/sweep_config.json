@@ -1,8 +1,0 @@
-{
-  "batch_id": "refined_test",
-  "method": "grid",
-  "n_combos": 2,
-  "config_outputs": "C:\\Users\\tmaku\\.cursor\\worktrees\\NBA_Playoff_Strentgh_Project\\net\\outputs3",
-  "val_frac": 0.25,
-  "phase": "full"
-}

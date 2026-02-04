@@ -33,14 +33,14 @@ def _reserve_run_id(outputs_dir: Path, config: dict) -> None:
     path = outputs_dir / ".current_run"
     path.write_text(run_id.strip(), encoding="utf-8")
 
-from src.data.db_loader import load_training_data
+from src.data.db_loader import load_playoff_data, load_training_data
 from src.training.data_model_a import build_batches_from_db, build_batches_from_lists
 from src.training.train_model_a import predict_batches, train_model_a, train_model_a_on_batches
 from src.training.build_lists import build_lists
 from src.utils.split import compute_split, get_train_seasons_ordered, group_lists_by_season, write_split_info
 
 
-def _run_walk_forward(config, train_lists, games, tgl, teams, pgl, out, root):
+def _run_walk_forward(config, train_lists, games, tgl, teams, pgl, out, root, playoff_games=None, playoff_tgl=None):
     """Per-season walk-forward: train on 1..k, validate on k+1; final step trains on all and saves."""
     import torch
 
@@ -79,16 +79,20 @@ def _run_walk_forward(config, train_lists, games, tgl, teams, pgl, out, root):
             step_train_lists = [step_train_lists[i] for i in sorted(step_idx)]
 
         train_batches, _ = build_batches_from_lists(
-            step_train_lists, games, tgl, teams, pgl, config, device=device
+            step_train_lists, games, tgl, teams, pgl, config, device=device,
         )
         if not train_batches:
-            train_batches = build_batches_from_db(games, tgl, teams, pgl, config)
+            train_batches = build_batches_from_db(
+                games, tgl, teams, pgl, config,
+                playoff_games=playoff_games,
+                playoff_tgl=playoff_tgl,
+            )
 
         val_batches = None
         val_metas = []
         if step_val_lists:
             val_batches, val_metas = build_batches_from_lists(
-                step_val_lists, games, tgl, teams, pgl, config, device=device
+                step_val_lists, games, tgl, teams, pgl, config, device=device,
             )
 
         model = train_model_a_on_batches(
@@ -146,6 +150,18 @@ def main():
         print("Database not found. Run scripts 1_download_raw and 2_build_db first.", file=sys.stderr)
         sys.exit(1)
     games, tgl, teams, pgl = load_training_data(db_path)
+    listmle_target = (config.get("training") or {}).get("listmle_target")
+    playoff_games, playoff_tgl = None, None
+    if listmle_target == "playoff_outcome":
+        try:
+            pg, ptgl, _ = load_playoff_data(db_path)
+            if not pg.empty and not ptgl.empty:
+                playoff_games, playoff_tgl = pg, ptgl
+                print("Loaded playoff data for listmle_target=playoff_outcome", flush=True)
+            else:
+                print("Warning: playoff data empty; falling back to standings for ListMLE.", flush=True)
+        except Exception as e:
+            print(f"Warning: could not load playoff data ({e}); falling back to standings.", flush=True)
     out = Path(config["paths"]["outputs"])
     if not out.is_absolute():
         out = ROOT / out
@@ -153,17 +169,28 @@ def main():
     # Reserve run_id for this pipeline run so inference (script 6) writes to the same folder
     _reserve_run_id(out, config)
 
-    lists = build_lists(tgl, games, teams, config=config)
+    lists = build_lists(
+        tgl, games, teams,
+        config=config,
+        playoff_games=playoff_games,
+        playoff_tgl=playoff_tgl,
+    )
     print(f"build_lists: {len(lists)} lists", flush=True)
     if not lists:
-        batches = build_batches_from_db(games, tgl, teams, pgl, config)
+        batches = build_batches_from_db(
+            games, tgl, teams, pgl, config,
+            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+        )
         path = train_model_a(config, out, batches=batches)
         print(f"Saved {path} (no lists for OOF)")
         return
 
     valid_lists = [lst for lst in lists if len(lst["team_ids"]) >= 2]
     if not valid_lists:
-        batches = build_batches_from_db(games, tgl, teams, pgl, config)
+        batches = build_batches_from_db(
+            games, tgl, teams, pgl, config,
+            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+        )
         path = train_model_a(config, out, batches=batches)
         print(f"Saved {path} (no valid lists for OOF)")
         return
@@ -173,14 +200,17 @@ def main():
     write_split_info(split_info, out)
     print(f"Split: {split_info['split_mode']} — train {split_info['n_train_lists']} lists, test {split_info['n_test_lists']} lists", flush=True)
     if not train_lists:
-        batches = build_batches_from_db(games, tgl, teams, pgl, config)
+        batches = build_batches_from_db(
+            games, tgl, teams, pgl, config,
+            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+        )
         path = train_model_a(config, out, batches=batches)
         print(f"Saved {path} (no train lists after split)")
         return
 
     walk_forward = bool(config.get("training", {}).get("walk_forward", False))
     if walk_forward:
-        _run_walk_forward(config, train_lists, games, tgl, teams, pgl, out, ROOT)
+        _run_walk_forward(config, train_lists, games, tgl, teams, pgl, out, ROOT, playoff_games, playoff_tgl)
         return
 
     n_folds = config.get("training", {}).get("n_folds", 5)
@@ -217,7 +247,10 @@ def main():
             "No batches from build_batches_from_lists (player_game_logs required). Skipping OOF; training final model only.",
             file=sys.stderr,
         )
-        all_batches = build_batches_from_db(games, tgl, teams, pgl, config)
+        all_batches = build_batches_from_db(
+            games, tgl, teams, pgl, config,
+            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+        )
         path = train_model_a(config, out, batches=all_batches)
         print(f"Saved {path} (no oof_model_a.parquet)")
         return
@@ -276,7 +309,10 @@ def main():
     print("Building final batches...", flush=True)
     all_batches, _ = build_batches_from_lists(all_lists, games, tgl, teams, pgl, config, device=device)
     if not all_batches:
-        all_batches = build_batches_from_db(games, tgl, teams, pgl, config)
+        all_batches = build_batches_from_db(
+            games, tgl, teams, pgl, config,
+            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+        )
     path = train_model_a(config, out, batches=all_batches)
     print(f"Saved {path}")
 
