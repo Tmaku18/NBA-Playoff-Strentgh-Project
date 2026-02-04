@@ -275,8 +275,8 @@ Same pattern for `ndcg`, `ndcg10`, `playoff_spearman`, `rank_mae`, `rank_rmse`.
 
 ## Robustness Adjustments
 
-- If trials run longer than 15 min (e.g. 25 min), reduce `n_trials` to keep under 3 hours:
-  - `ceil(20/4) × 25 = 125 min` per sweep → use `n_trials=12` → `ceil(12/4)×25 = 75 min`
+- **4-hour budget per objective:** Use `n_trials=12`, `--no-run-explain` so each objective batch (2 sweeps + analysis) finishes in &lt; 4 hours with 4 jobs. See [phased_sweep_execution_plan_d0f3e0a3.plan.md](phased_sweep_execution_plan_d0f3e0a3.plan.md).
+- If trials run longer than 15 min (e.g. 25 min), `n_trials=12` keeps sweep under 90 min: `ceil(12/4) × 25 = 75 min`; with 30 min trials: 90 min.
 - If a sweep finishes early (Optuna early-stop or fewer trials), use the saved time for extra analysis or documentation.
 
 ---

@@ -14,6 +14,7 @@ This document analyzes the Phase 0 baseline exploratory sweeps and compares resu
    - Run in **foreground** (never background).
    - Use **n_jobs=4** (4 parallel workers).
    - Use **no timeout** — let the sweep run until completion.
+   - **Phase 1 robust settings:** n_trials=12, --no-run-explain — keeps each objective batch (2 sweeps + analysis) under 4 hours.
 
 3. **After each sweep**
    - Update this document with results, best combo, and interpretation.
@@ -28,8 +29,14 @@ This document analyzes the Phase 0 baseline exploratory sweeps and compares resu
 - **Config caps** — Lower `max_lists_oof` and `max_final_batches` in `baseline_max_features.yaml` for faster Model A training (trade: fewer lists).
 
 **Invocation template:** Valid objectives: `spearman`, `ndcg4`, `ndcg16`, `ndcg20`, `playoff_spearman`, `rank_rmse`.
+- **Phase 0 (baseline):** n_trials=6, phase=baseline
+- **Phase 1 (robust, &lt; 4 h per objective):** n_trials=12, phase=phase1, --no-run-explain
+
 ```powershell
+# Phase 0
 python -m scripts.sweep_hparams --method optuna --n-trials 6 --n-jobs 4 --objective <OBJ> --listmle-target <TARGET> --phase baseline --batch-id <BATCH_ID> --config config/baseline_max_features.yaml
+# Phase 1 (robust)
+python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-run-explain --objective <OBJ> --listmle-target <TARGET> --phase phase1 --batch-id <BATCH_ID> --config config/baseline_max_features.yaml
 ```
 
 ---

@@ -36,3 +36,8 @@ venv/
 .env
 *.duckdb
 *.parquet
+
+# RAPTOR data and related docs (local/cache)
+data/modern_RAPTOR_by_team.csv
+docs/Team_Records.csv
+docs/modern_RAPTOR_by_team.csv
