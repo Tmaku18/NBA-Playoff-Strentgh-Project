@@ -52,7 +52,7 @@ This project builds a multi-modal stacking ensemble to predict NBA team strength
 ### 2.4 Model B (XGBoost + Random Forest)
 
 - **Features:** Team-context features only (no net_rating): rolling win rates, point differentials, SOS/SRS where enabled, optional Elo, team rolling, motivation, injury adjustment. Built in `src.features.team_context`; forbidden list enforced in training.
-- **Training:** K-fold OOF; XGB and RF trained separately; OOF predictions passed to the stacker. See `src.models.xgb_model`, `src.models.rf_model`, `src.training.train_model_b`.
+- **Training:** K-fold OOF; Model B (XGBoost) and Model C (RF) trained separately; OOF predictions passed to the stacker. See `src.models.xgb_model`, `src.models.rf_model`, `src.training.train_model_b`.
 
 ### 2.5 Stacking and inference
 
@@ -88,7 +88,9 @@ This project builds a multi-modal stacking ensemble to predict NBA team strength
 ### 3.4 Playoff-specific metrics
 
 - **Spearman (predicted vs playoff rank):** Correlation between predicted global rank and end-of-season playoff performance rank (champion=1, …, 30).
+- **NDCG@10 (ndcg10):** Same as main ndcg; explicit key for clarity. In playoff_metrics: `ndcg10_pred_vs_playoff` (NDCG@10 with playoff rank as relevance).
 - **Brier (championship odds):** One-hot champion vs predicted championship probabilities. See `brier_champion` in `src.evaluation.metrics`.
+- **rank_mae, rank_rmse:** Rank-distance metrics (pred vs actual playoff rank; lower = better). Used for model and standings baselines (`pred_vs_playoff`, `standings_vs_playoff`). See `rank_mae`, `rank_rmse` in `src.evaluation.metrics`.
 
 ### 3.5 Per-conference caveat
 
@@ -198,7 +200,7 @@ Chronological narrative from commit history and plans:
   - `outputs2/ANALYSIS.md` — run_020/021 comparison, metrics interpretation, known issues.  
   - `outputs/ANALYSIS.md` — run_009–016 metrics, 75/25 split, playoff data caveat.  
   - `config/defaults.yaml` — paths, seasons, model_a/model_b/training/sweep config.  
-  - `scripts/` — 1_download_raw, 2_build_db, 3_train_model_a, 4_train_model_b, 4b_train_stacking, 5_evaluate, 5b_explain, 6_run_inference, run_pipeline_from_model_a, sweep_hparams.  
+  - `scripts/` — 1_download_raw, 2_build_db, 3_train_model_a, 4_train_models_b_and_c, 4b_train_stacking, 5_evaluate, 5b_explain, 6_run_inference, run_pipeline_from_model_a, sweep_hparams.  
   - `src/` — data, evaluation, features, inference, models, training, utils, viz.
 
 ---

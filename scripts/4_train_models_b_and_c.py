@@ -1,4 +1,4 @@
-"""Train Model B (XGB + RF) on real DB team-context features. Option A: K-fold OOF, then final models."""
+"""Train Models B and C (XGBoost + Random Forest) on real DB team-context features. Option A: K-fold OOF, then final models."""
 import argparse
 import sys
 from pathlib import Path
@@ -67,7 +67,7 @@ def main():
         sys.exit(1)
     df = df[df["as_of_date"].isin(train_dates_set)].copy()
     flat = flat[flat["as_of_date"].isin(train_dates_set)].copy()
-    print(f"Model B: using {len(df)} rows on {len(train_dates_set)} train dates", flush=True)
+    print(f"Models B & C: using {len(df)} rows on {len(train_dates_set)} train dates", flush=True)
 
     n_folds = config.get("training", {}).get("n_folds", 5)
     dates_sorted = sorted(df["as_of_date"].unique())

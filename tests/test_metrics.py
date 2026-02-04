@@ -8,6 +8,7 @@ from src.evaluation.metrics import (
     brier_champion,
     brier_score,
     ndcg_at_4,
+    ndcg_at_10,
     ndcg_score,
     mrr,
     roc_auc_upset,
@@ -86,6 +87,13 @@ def test_ndcg_at_4():
     rank = np.array([1.0, 2.0, 3.0, 4.0])  # 1=best
     score = np.array([4.0, 3.0, 2.0, 1.0])  # higher = better predicted
     out = ndcg_at_4(rank, score)
+    assert 0 <= out <= 1 and np.isfinite(out)
+
+
+def test_ndcg_at_10():
+    rank = np.array([1.0, 2.0, 3.0, 4.0, 5.0])  # 1=best
+    score = np.array([5.0, 4.0, 3.0, 2.0, 1.0])  # higher = better predicted
+    out = ndcg_at_10(rank, score)
     assert 0 <= out <= 1 and np.isfinite(out)
 
 

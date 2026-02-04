@@ -50,7 +50,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - **Ranking:** NDCG, Spearman, MRR (mrr_top2 = champion+runner-up, mrr_top4 = conference finals), Precision@4, Precision@2 (planned). (Previously MRR used top_k=2 for two-conference “rank 1”).
 - **Future outcomes:** Brier score.
 - **Sleeper detection:** ROC-AUC on upsets (sleeper = actual rank worse than predicted rank); constant-label guard returns 0.5.
-- **Playoff metrics** (when playoff data and predictions include post_playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), Brier score on championship odds (one-hot champion vs predicted odds). Section `playoff_metrics` in `eval_report.json`.
+- **Playoff metrics** (when playoff data and predictions include post_playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), NDCG@10, Brier score on championship odds (one-hot champion vs predicted odds), rank_mae and rank_rmse (predicted rank vs actual playoff rank; standings baselines when applicable). Section `playoff_metrics` in `eval_report.json`.
 - **Report:** `eval_report.json` includes `notes` and, when applicable, `playoff_metrics`.
 - **Baselines:** rank-by-SRS, rank-by-Net-Rating, **Dummy** (e.g. previous-season rank or rank-by-net-rating).
 
@@ -79,13 +79,13 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
    - `python -m scripts.2_build_db` — build DuckDB from raw → path in `config.paths.db` (e.g. `nba_build.duckdb`), update `data/manifest.json`. If `build_db.skip_if_exists: true` (default) and the DB file already exists, the build is skipped to keep the current DB.
 4. **Training (real DB):**  
    - `python -m scripts.3_train_model_a` — K-fold OOF → outputs dir `oof_model_a.parquet`, then final model → `best_deep_set.pt`.  
-   - `python -m scripts.4_train_model_b` — K-fold OOF → outputs dir `oof_model_b.parquet`, then XGB + RF → `xgb_model.joblib`, `rf_model.joblib`.  
+   - `python -m scripts.4_train_models_b_and_c` — K-fold OOF → outputs dir `oof_model_b.parquet`, then Model B (XGBoost) + Model C (RF) → `xgb_model.joblib`, `rf_model.joblib`.  
    - `python -m scripts.4b_train_stacking` — merge OOF parquets, RidgeCV → outputs dir `ridgecv_meta.joblib`, `oof_pooled.parquet` (requires OOF from 3 and 4).
 5. **Inference:** `python -m scripts.6_run_inference` — load DB and models, run Model A/B + meta → outputs dir `<run_id>/predictions.json`, plots. With `inference.run_id: null`, run_id auto-increments (e.g. run_019, run_020 when using `outputs2/` and `run_id_base: 19`) so each full pipeline run gets a new folder.
 6. **Evaluation:** `python -m scripts.5_evaluate` — uses predictions from the latest (or configured) run_id → outputs dir `eval_report.json` (NDCG, Spearman, MRR, ROC-AUC upset).
 7. **Explainability:** `python -m scripts.5b_explain` (uses `config/defaults.yaml`) or `python -m scripts.5b_explain --config path/to/config.yaml` — SHAP on Model B → `shap_summary.png`; attention ablation and Integrated Gradients (Model A) when Captum is installed → `ig_model_a_attributions.txt`. Use `--config` to run explain on a **sweep best combo** (e.g. `outputs3/sweeps/<batch_id>/combo_0002/config.yaml`).
 8. **Clone classifier (optional):** `python -m scripts.4c_train_classifier_clone --config config/clone_classifier.yaml` — XGBoost binary classifier (playoff team vs not) on Train 2015–2022, Val 2023, Holdout 2024; outputs `clone_classifier_report.json` (AUC-ROC, Brier).
-9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5) per combo; writes to **`outputs3/sweeps/<batch_id>/`**. Use `--method optuna --n-trials N` for Bayesian tuning. **`--objective spearman|ndcg|playoff_spearman|rank_mae`** sets which metric Optuna optimizes (run separate sweeps for each objective and compare). After the sweep, **explain (5b_explain) runs automatically** on the best combo unless `--no-run-explain`. Use `--dry-run` to preview combos, `--max-combos N` to limit (grid only).
+9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5) per combo; writes to **`outputs3/sweeps/<batch_id>/`**. Use `--method optuna --n-trials N` for Bayesian tuning. **`--objective spearman|ndcg|ndcg10|playoff_spearman|rank_mae|rank_rmse`** sets which metric Optuna optimizes (run separate sweeps for each objective and compare). After the sweep, **explain (5b_explain) runs automatically** on the best combo unless `--no-run-explain`. Use `--dry-run` to preview combos, `--max-combos N` to limit (grid only).
 
 **Optional:** `python -m scripts.run_manifest` (run manifest); `python -m scripts.run_leakage_tests` (before training); `python -m scripts.1b_download_injuries` (stub for injury data); `python -m scripts.1c_download_raptor` (RAPTOR CSV from FiveThirtyEight).
 
@@ -126,7 +126,7 @@ All paths under the configured outputs dir (`outputs3/` for sweeps and new runs;
 - `outputs/oof_pooled.parquet`, `outputs/ridgecv_meta.joblib` — stacking meta-learner and pooled OOF (script 4b).
 - `outputs/clone_classifier_report.json`, `outputs/clone_xgb_classifier.joblib` — clone classifier (script 4c).
 - `outputs/oof_model_a.parquet`, `outputs/oof_model_b.parquet` — OOF from scripts 3 and 4 (Option A: K-fold, real data).
-- `outputs/best_deep_set.pt`, `outputs/xgb_model.joblib`, `outputs/rf_model.joblib` — trained Model A and Model B.
+- `outputs/best_deep_set.pt`, `outputs/xgb_model.joblib`, `outputs/rf_model.joblib` — trained Model A, Model B (XGBoost), and Model C (RF).
 - `docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md` — Analysis of Model A attention weights: architecture walkthrough, run_023 inferences (star-dominant vs. distributed), hyperparameter/metric tracking framework, conference vs. league-wide. Updated with each run/sweep.
 
 ---

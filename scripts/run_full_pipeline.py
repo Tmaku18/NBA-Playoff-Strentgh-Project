@@ -20,7 +20,7 @@ def main() -> int:
         "2_build_db.py",
         "run_leakage_tests.py",
         "3_train_model_a.py",
-        "4_train_model_b.py",
+        "4_train_models_b_and_c.py",
         "4b_train_stacking.py",
         "6_run_inference.py",
         "5_evaluate.py",

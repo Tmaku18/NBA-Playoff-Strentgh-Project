@@ -72,6 +72,12 @@ def ndcg_at_4(y_true_rank: np.ndarray, y_score: np.ndarray) -> float:
     return ndcg_score(relevance, np.asarray(y_score).ravel(), k=4)
 
 
+def ndcg_at_10(y_true_rank: np.ndarray, y_score: np.ndarray) -> float:
+    """NDCG@10 for ranking: y_true_rank is ground-truth rank (1=best, 30=worst). Relevance = 30 - rank + 1."""
+    relevance = (30.0 - np.asarray(y_true_rank).ravel() + 1.0).clip(1, 30)
+    return ndcg_score(relevance, np.asarray(y_score).ravel(), k=10)
+
+
 def brier_champion(y_onehot: np.ndarray, y_prob: np.ndarray) -> float:
     """Brier score for champion prediction: y_onehot is 1 for champion, 0 else; y_prob are championship probabilities."""
     return brier_score(np.asarray(y_onehot).ravel(), np.asarray(y_prob).ravel())

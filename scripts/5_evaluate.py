@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.evaluation.evaluate import evaluate_ranking, evaluate_upset
-from src.evaluation.metrics import brier_champion, ndcg_at_4, ndcg_score, rank_mae, rank_rmse, spearman
+from src.evaluation.metrics import brier_champion, ndcg_at_4, ndcg_at_10, ndcg_score, rank_mae, rank_rmse, spearman
 from src.utils.split import load_split_info
 
 
@@ -128,10 +128,11 @@ def _compute_metrics_from_arrays(
     """Compute ndcg, spearman, mrr, roc_auc_upset from arrays."""
     n = len(y_actual)
     if n < 2:
-        return {"ndcg": 0.0, "spearman": 0.0, "mrr_top2": 0.0, "mrr_top4": 0.0, "roc_auc_upset": 0.5}
+        return {"ndcg": 0.0, "ndcg10": 0.0, "spearman": 0.0, "mrr_top2": 0.0, "mrr_top4": 0.0, "roc_auc_upset": 0.5}
     max_rank = int(np.max(y_actual)) if n else 0
     y_true_relevance = (max_rank - y_actual + 1).clip(1, max_rank if max_rank > 0 else 1)
     m = evaluate_ranking(y_true_relevance, y_score, k=min(k, n))
+    m["ndcg10"] = m["ndcg"]  # ndcg already uses k=10; explicit key for clarity
     delta = y_actual - pred_ranks_arr
     y_bin = (delta > 0).astype(np.float32)
     if np.unique(y_bin).size >= 2:
@@ -177,6 +178,7 @@ def _compute_metrics(teams: list, *, k: int = 10) -> dict:
         m["playoff_metrics"] = {
             "spearman_pred_vs_playoff_rank": float(spearman(p_rank, g_rank)),
             "ndcg_at_4_final_four": float(ndcg_at_4(p_rank, -g_rank)),
+            "ndcg10_pred_vs_playoff": float(ndcg_at_10(p_rank, -g_rank)),
             "brier_championship_odds": float(brier_champion(champion_onehot, odds_pct)),
             "rank_mae_pred_vs_playoff": m["rank_mae_pred_vs_playoff"],
             "rank_rmse_pred_vs_playoff": m["rank_rmse_pred_vs_playoff"],
@@ -306,8 +308,8 @@ def main():
         season_report: dict = {
             "test_metrics_ensemble": metrics_ensemble,
             "test_metrics_model_a": metrics_model_a,
-            "test_metrics_xgb": metrics_xgb,
-            "test_metrics_rf": metrics_rf,
+            "test_metrics_model_b": metrics_xgb,
+            "test_metrics_model_c": metrics_rf,
             "test_metrics_by_conference": conf_metrics,
             "notes": {"eos_rank_source": eos_source},
         }
@@ -327,16 +329,16 @@ def main():
             by_model, _, _ = _teams_to_arrays_by_model(primary_teams)
             report["test_metrics_ensemble"] = metrics_ens
             report["test_metrics_model_a"] = _compute_metrics_from_arrays(by_model["model_a"][0], by_model["model_a"][1], by_model["model_a"][2]) if "model_a" in by_model else {}
-            report["test_metrics_xgb"] = _compute_metrics_from_arrays(by_model["xgb"][0], by_model["xgb"][1], by_model["xgb"][2]) if "xgb" in by_model else {}
-            report["test_metrics_rf"] = _compute_metrics_from_arrays(by_model["rf"][0], by_model["rf"][1], by_model["rf"][2]) if "rf" in by_model else {}
+            report["test_metrics_model_b"] = _compute_metrics_from_arrays(by_model["xgb"][0], by_model["xgb"][1], by_model["xgb"][2]) if "xgb" in by_model else {}
+            report["test_metrics_model_c"] = _compute_metrics_from_arrays(by_model["rf"][0], by_model["rf"][1], by_model["rf"][2]) if "rf" in by_model else {}
             report["test_metrics_by_conference"] = _metrics_by_conference(primary_teams)
     elif by_season:
         last_season = sorted(by_season.keys())[-1]
         last_report = by_season[last_season]
         report["test_metrics_ensemble"] = last_report["test_metrics_ensemble"].copy()
         report["test_metrics_model_a"] = last_report["test_metrics_model_a"]
-        report["test_metrics_xgb"] = last_report["test_metrics_xgb"]
-        report["test_metrics_rf"] = last_report["test_metrics_rf"]
+        report["test_metrics_model_b"] = last_report.get("test_metrics_model_b") or last_report.get("test_metrics_xgb", {})
+        report["test_metrics_model_c"] = last_report.get("test_metrics_model_c") or last_report.get("test_metrics_rf", {})
         report["test_metrics_by_conference"] = last_report["test_metrics_by_conference"]
         report["notes"]["eos_rank_source"] = last_report["notes"].get("eos_rank_source", "standings")
         report["by_season"] = by_season
@@ -363,8 +365,8 @@ def main():
             report["train_metrics_ensemble"] = _compute_metrics(train_teams)
             by_model_t, _, _ = _teams_to_arrays_by_model(train_teams)
             report["train_metrics_model_a"] = _compute_metrics_from_arrays(by_model_t["model_a"][0], by_model_t["model_a"][1], by_model_t["model_a"][2]) if "model_a" in by_model_t else {}
-            report["train_metrics_xgb"] = _compute_metrics_from_arrays(by_model_t["xgb"][0], by_model_t["xgb"][1], by_model_t["xgb"][2]) if "xgb" in by_model_t else {}
-            report["train_metrics_rf"] = _compute_metrics_from_arrays(by_model_t["rf"][0], by_model_t["rf"][1], by_model_t["rf"][2]) if "rf" in by_model_t else {}
+            report["train_metrics_model_b"] = _compute_metrics_from_arrays(by_model_t["xgb"][0], by_model_t["xgb"][1], by_model_t["xgb"][2]) if "xgb" in by_model_t else {}
+            report["train_metrics_model_c"] = _compute_metrics_from_arrays(by_model_t["rf"][0], by_model_t["rf"][1], by_model_t["rf"][2]) if "rf" in by_model_t else {}
             report["train_metrics_by_conference"] = _metrics_by_conference(train_teams)
             report["notes"]["train_eos_rank_source"] = train_data.get("eos_rank_source", "standings")
 

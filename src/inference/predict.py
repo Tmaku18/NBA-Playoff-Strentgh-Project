@@ -29,7 +29,14 @@ def load_models(
     if model_a_path and Path(model_a_path).exists():
         ck = torch.load(model_a_path, map_location="cpu", weights_only=False)
         attn_cfg = ma.get("attention", {})
-        stat_dim = int(ma.get("stat_dim", ma.get("expected_stat_dim", 14)))
+        embed_dim = int(ma.get("embedding_dim", 32))
+        # Infer stat_dim from checkpoint to match trained model (avoids config/checkpoint mismatch)
+        state = ck.get("model_state", ck) if isinstance(ck, dict) else {}
+        if "enc.mlp.0.weight" in state:
+            enc_in = state["enc.mlp.0.weight"].shape[1]
+            stat_dim = int(enc_in) - embed_dim
+        else:
+            stat_dim = int(ma.get("stat_dim", ma.get("expected_stat_dim", 14)))
         model_a = DeepSetRank(
             ma.get("num_embeddings", 500),
             ma.get("embedding_dim", 32),
@@ -218,7 +225,7 @@ def predict_teams(
             "conference": conf,
             "prediction": pred_dict,
             "analysis": analysis_dict,
-            "ensemble_diagnostics": {"model_agreement": agreement, "deep_set_rank": int(r_a) if r_a is not None else None, "xgboost_rank": int(r_x) if r_x is not None else None, "random_forest_rank": int(r_r) if r_r is not None else None},
+            "ensemble_diagnostics": {"model_agreement": agreement, "deep_set_rank": int(r_a) if r_a is not None else None, "xgboost_rank": int(r_x) if r_x is not None else None, "random_forest_rank": int(r_r) if r_r is not None else None, "model_b_rank": int(r_x) if r_x is not None else None, "model_c_rank": int(r_r) if r_r is not None else None},
             "roster_dependence": {
                 "primary_contributors": [
                     {"player": str(p), "attention_weight": float(w)}
@@ -837,13 +844,19 @@ def run_inference_from_db(
 
 def run_inference(output_dir: str | Path, config: dict, run_id: str | None = None) -> Path:
     """Run inference: from DB if present and has data, else exit with message (real run only)."""
+    import os
+
     out = Path(output_dir)
     if run_id:
         out = out / run_id
     out.mkdir(parents=True, exist_ok=True)
     paths_cfg = config.get("paths", {})
     db_path = Path(paths_cfg.get("db", "data/processed/nba_build.duckdb"))
-    if not db_path.is_absolute():
+    # Use canonical DB with playoff data when NBA_DB_PATH is set (e.g. from worktree)
+    db_override = os.environ.get("NBA_DB_PATH")
+    if db_override and str(db_override).strip():
+        db_path = Path(db_override.strip())
+    elif not db_path.is_absolute():
         from pathlib import Path as P
         root = P(__file__).resolve().parents[2]
         db_path = root / db_path

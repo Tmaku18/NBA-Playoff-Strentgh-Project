@@ -56,6 +56,7 @@ def _run_one_combo_worker(
     min_leaf: int,
     include_clone: bool,
     val_frac: float,
+    listmle_target: str | None = None,
 ) -> dict:
     """Top-level worker for ProcessPoolExecutor; runs one combo and returns metrics or error."""
     return _run_one_combo(
@@ -73,12 +74,33 @@ def _run_one_combo_worker(
         min_leaf,
         include_clone,
         val_frac=val_frac,
+        listmle_target=listmle_target,
     )
 
 
-def _load_config() -> dict:
-    with open(ROOT / "config" / "defaults.yaml", "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base. Modifies base in place."""
+    for k, v in override.items():
+        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+            _deep_merge(base[k], v)
+        else:
+            base[k] = v
+    return base
+
+
+def _load_config(config_path: str | Path | None = None) -> dict:
+    defaults_path = ROOT / "config" / "defaults.yaml"
+    with open(defaults_path, "r", encoding="utf-8") as f:
+        config = copy.deepcopy(yaml.safe_load(f))
+    if config_path:
+        path = Path(config_path)
+        if not path.is_absolute():
+            path = ROOT / path
+        if path.exists() and path != defaults_path:
+            with open(path, "r", encoding="utf-8") as f:
+                overrides = yaml.safe_load(f)
+            if overrides:
+                _deep_merge(config, overrides)
     # From any worktree: use canonical DB with playoff data if NBA_DB_PATH is set
     db_override = __import__("os").environ.get("NBA_DB_PATH")
     if db_override and db_override.strip():
@@ -133,7 +155,7 @@ def _collect_metrics(eval_path: Path) -> dict:
     except Exception:
         return {}
     out = {}
-    for key in ("test_metrics_ensemble", "test_metrics_model_a", "test_metrics_xgb", "test_metrics_rf"):
+    for key in ("test_metrics_ensemble", "test_metrics_model_a", "test_metrics_model_b", "test_metrics_model_c", "test_metrics_xgb", "test_metrics_rf"):
         m = data.get(key, {})
         if isinstance(m, dict):
             for k, v in m.items():
@@ -168,6 +190,7 @@ def _run_one_combo(
     min_leaf: int,
     include_clone: bool,
     val_frac: float = 0.25,
+    listmle_target: str | None = None,
 ) -> dict:
     """Run one pipeline (3, 4, 4b, 6, 5) with given params; return metrics dict or error."""
     combo_dir = batch_dir / f"combo_{combo_idx:04d}"
@@ -177,6 +200,8 @@ def _run_one_combo(
     cfg = copy.deepcopy(config)
     cfg["training"] = cfg.get("training", {})
     cfg["training"]["rolling_windows"] = list(rolling_windows)
+    if listmle_target is not None:
+        cfg["training"]["listmle_target"] = listmle_target
     cfg["model_a"] = cfg.get("model_a", {})
     cfg["model_a"]["epochs"] = int(epochs)
     cfg["model_a"]["early_stopping_val_frac"] = float(val_frac)
@@ -196,7 +221,7 @@ def _run_one_combo(
     _write_config(config_path, cfg)
     pipeline = [
         ("scripts/3_train_model_a.py", "Model A"),
-        ("scripts/4_train_model_b.py", "Model B"),
+        ("scripts/4_train_models_b_and_c.py", "Models B & C"),
         ("scripts/4b_train_stacking.py", "Stacking"),
         ("scripts/6_run_inference.py", "Inference"),
         ("scripts/5_evaluate.py", "Eval"),
@@ -221,8 +246,8 @@ def main() -> int:
         "--objective",
         type=str,
         default="spearman",
-        choices=("spearman", "ndcg", "playoff_spearman", "rank_mae"),
-        help="Optuna: metric to optimize (rank_mae = minimize; others = maximize). Default spearman.",
+        choices=("spearman", "ndcg", "ndcg10", "playoff_spearman", "rank_mae", "rank_rmse"),
+        help="Optuna: metric to optimize (rank_mae/rank_rmse = minimize; others = maximize). Default spearman.",
     )
     parser.add_argument("--no-run-explain", action="store_true", help="Skip running 5b_explain on best combo after sweep")
     parser.add_argument("--val-frac", type=float, default=0.25, help="Model A early-stopping validation fraction (default 0.25)")
@@ -230,8 +255,16 @@ def main() -> int:
         "--phase",
         type=str,
         default="full",
-        choices=("full", "phase1_xgb", "phase2_rf"),
-        help="Grid: full=config grid; phase1_xgb=XGB local grid; phase2_rf=RF local grid (default full)",
+        choices=("full", "phase1_xgb", "phase2_rf", "baseline"),
+        help="full=config grid; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges for exploratory (Optuna only)",
+    )
+    parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
+    parser.add_argument(
+        "--listmle-target",
+        type=str,
+        default=None,
+        choices=("final_rank", "playoff_outcome"),
+        help="Override training.listmle_target (final_rank=standings, playoff_outcome=playoff result). Omit to use config.",
     )
     parser.add_argument(
         "--n-jobs",
@@ -244,7 +277,7 @@ def main() -> int:
     parser.add_argument("--halving-epochs-full", type=int, default=None, help="Halving: Model A epochs in round 2 (default: max of sweep epoch list)")
     args = parser.parse_args()
 
-    config = _load_config()
+    config = _load_config(args.config)
     out_name = config.get("paths", {}).get("outputs", "outputs")
     out_dir = Path(out_name) if Path(out_name).is_absolute() else ROOT / out_name
     sweeps_dir = out_dir / "sweeps"
@@ -299,17 +332,31 @@ def main() -> int:
         subsample_list = [0.8]
         colsample_list = [0.8]
         min_leaf_list = [4, 5, 6]
+    elif phase == "baseline":
+        # Phase 0 (baseline): wide ranges for exploratory sweeps; smallest combo covering widest range
+        epochs_list = list(range(8, 29))  # 8-28
+        max_depth_list = [3, 4, 5, 6]
+        lr_list = [0.05, 0.08, 0.10, 0.12]
+        n_xgb_list = [200, 250, 300, 350]
+        n_rf_list = [150, 200, 250]
+        subsample_list = [0.8]
+        colsample_list = [0.7]
+        min_leaf_list = [4, 5, 6]
+
+    listmle_target = getattr(args, "listmle_target", None)
 
     if args.method == "optuna":
         import optuna
         _OBJECTIVE_KEYS = {
             "spearman": "test_metrics_ensemble_spearman",
             "ndcg": "test_metrics_ensemble_ndcg",
+            "ndcg10": "test_metrics_ensemble_ndcg10",
             "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank",
             "rank_mae": "test_metrics_ensemble_rank_mae_pred_vs_playoff",
+            "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff",
         }
         metric_key = _OBJECTIVE_KEYS[args.objective]
-        direction = "minimize" if args.objective == "rank_mae" else "maximize"
+        direction = "minimize" if args.objective in ("rank_mae", "rank_rmse") else "maximize"
 
         def objective(trial: "optuna.Trial") -> float:
             rolling_windows = trial.suggest_categorical("rolling_windows", [tuple(x) for x in rolling_list])
@@ -327,6 +374,7 @@ def main() -> int:
                 batch_dir, i, config, list(rolling_windows), epochs,
                 max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf, include_clone,
                 val_frac=val_frac,
+                listmle_target=listmle_target,
             )
             if "error" in metrics:
                 print(f"  FAILED: {metrics['error']}", flush=True)
@@ -422,6 +470,7 @@ def main() -> int:
                 batch_dir, i, config, list(rw), epochs_cheap,
                 md, lr_v, nx, nr, sub, col, mleaf, include_clone,
                 val_frac=val_frac,
+                listmle_target=listmle_target,
             )
             if "error" in m and m["error"] == "Inference":
                 print("Sweep aborted: inference failed. Exiting.", flush=True)
@@ -442,6 +491,7 @@ def main() -> int:
                 batch_dir, i, config, list(rw), epochs_full,
                 md, lr_v, nx, nr, sub, col, mleaf, include_clone,
                 val_frac=val_frac,
+                listmle_target=listmle_target,
             )
             rolling_windows, epochs, max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf = rw, ep, md, lr_v, nx, nr, sub, col, mleaf
             if "error" in metrics:
@@ -510,6 +560,7 @@ def main() -> int:
                     batch_dir, i, config, list(rolling_windows), epochs,
                     max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf, include_clone,
                     val_frac=val_frac,
+                    listmle_target=listmle_target,
                 )
                 if "error" in metrics:
                     print(f"  FAILED at {metrics['error']}", flush=True)
@@ -581,6 +632,7 @@ def main() -> int:
                         _run_one_combo_worker,
                         batch_dir, i, config, list(rw), ep, md, lr_v, nx, nr, sub, col, mleaf,
                         include_clone, val_frac,
+                        listmle_target,
                     )
                     futures[fut] = (i, c)
                 for fut in concurrent.futures.as_completed(futures):
@@ -616,7 +668,9 @@ def main() -> int:
     # Summary: best by spearman, ndcg, rank_mae (lower is better), etc. (grid) or by value (optuna)
     ensemble_key = "test_metrics_ensemble_spearman"
     ndcg_key = "test_metrics_ensemble_ndcg"
+    ndcg10_key = "test_metrics_ensemble_ndcg10"
     rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff"
+    rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff"
     playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank"
     valid = [r for r in results if ensemble_key in r and r.get(ensemble_key) is not None]
     valid_optuna = [r for r in results if "value" in r and r.get("value") is not None]
@@ -625,6 +679,18 @@ def main() -> int:
         if rank_mae_key in r
         and isinstance(r.get(rank_mae_key), (int, float))
         and math.isfinite(r.get(rank_mae_key))
+    ]
+    valid_rmse = [
+        r for r in results
+        if rank_rmse_key in r
+        and isinstance(r.get(rank_rmse_key), (int, float))
+        and math.isfinite(r.get(rank_rmse_key))
+    ]
+    valid_ndcg10 = [
+        r for r in results
+        if ndcg10_key in r
+        and isinstance(r.get(ndcg10_key), (int, float))
+        and math.isfinite(r.get(ndcg10_key))
     ]
     valid_playoff = [
         r for r in results
@@ -638,9 +704,15 @@ def main() -> int:
         best_ndcg = max(valid, key=lambda x: float(x.get(ndcg_key, -1)))
         summary["best_by_spearman"] = best_sp
         summary["best_by_ndcg"] = best_ndcg
+    if valid_ndcg10:
+        best_ndcg10 = max(valid_ndcg10, key=lambda x: float(x.get(ndcg10_key, -1)))
+        summary["best_by_ndcg10"] = best_ndcg10
     if valid_mae:
         best_mae = min(valid_mae, key=lambda x: float(x.get(rank_mae_key, float("inf"))))
         summary["best_by_rank_mae"] = best_mae
+    if valid_rmse:
+        best_rmse = min(valid_rmse, key=lambda x: float(x.get(rank_rmse_key, float("inf"))))
+        summary["best_by_rank_rmse"] = best_rmse
     if valid_playoff:
         best_playoff = max(valid_playoff, key=lambda x: float(x.get(playoff_spearman_key, -2)))
         summary["best_by_playoff_spearman"] = best_playoff

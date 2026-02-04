@@ -10,7 +10,7 @@ This document explains what each output file is, what each metric means, and how
 |------|--------|--------|
 | **predictions.json** | Script 6 (inference) | All teams, all test seasons combined (primary artifact for “latest run”). |
 | **predictions_2023-24.json**, **predictions_2024-25.json** | Script 6 | Per-season predictions when `test_seasons` is used. |
-| **eval_report.json** | Script 5 (evaluate) | Full evaluation report: ensemble + Model A / XGB / RF metrics, by-conference, playoff metrics, notes. When multiple test seasons exist, the **summary** metrics in the report are from the **last** test season (2024-25). |
+| **eval_report.json** | Script 5 (evaluate) | Full evaluation report: ensemble + Model A / Model B / Model C metrics, by-conference, playoff metrics, notes. When multiple test seasons exist, the **summary** metrics in the report are from the **last** test season (2024-25). |
 | **eval_report_2023-24.json**, **eval_report_2024-25.json** | Script 5 | Per-season metrics so you can compare 2023-24 vs 2024-25. |
 | **ANALYSIS_01.md** | Script 5 | Short human-readable summary: run id, EOS source, and test metrics (ensemble) from the report. |
 | **pred_vs_actual_*.png**, **pred_vs_playoff_rank_*.png** | Script 6 / 5 | Scatter plots: predicted strength/rank vs actual EOS/playoff rank, per season. |
@@ -23,7 +23,7 @@ This document explains what each output file is, what each metric means, and how
 
 ## 2. What each metric means
 
-- **NDCG** (Normalized Discounted Cumulative Gain): Quality of the **ranking** of teams. Relevance = strength (e.g. derived from EOS global rank). Higher = predicted order matches true strength better. 1.0 = perfect order.
+- **NDCG / NDCG@10 (ndcg10)**: Quality of the **ranking** of teams. Relevance = strength (e.g. derived from EOS global rank). Higher = predicted order matches true strength better. 1.0 = perfect order. ndcg and ndcg10 are the same (k=10).
 - **Spearman**: Correlation between **predicted score** and **actual strength** (rank). Positive = higher predictions for better teams. Strong positive ≈ 0.5–0.8.
 - **MRR top-2**: 1 / (rank of first team that is champion or runner-up in the predicted order). 1.0 = best team or runner-up is predicted #1.
 - **MRR top-4**: Same idea for “top 4” (conference finals). 1.0 = one of the true top 4 is predicted first.
@@ -31,6 +31,10 @@ This document explains what each output file is, what each metric means, and how
 - **Playoff metrics** (when playoff data exists):
   - **spearman_pred_vs_playoff_rank**: Correlation of predicted strength vs **post-playoff** rank (champion=1, etc.).
   - **ndcg_at_4_final_four**: NDCG@4 using final four (playoff) outcome as relevance.
+  - **ndcg10_pred_vs_playoff**: NDCG@10 with playoff rank as relevance (top 10 ranking quality).
+  - **rank_mae_pred_vs_playoff**: Mean absolute error of predicted rank vs actual playoff rank (lower = better).
+  - **rank_rmse_pred_vs_playoff**: RMSE of rank predictions; penalizes large errors more (lower = better).
+  - **rank_mae_standings_vs_playoff**, **rank_rmse_standings_vs_playoff**: Baselines (standings vs playoff outcome).
   - **brier_championship_odds**: Brier score for “champion yes/no” vs model’s championship probabilities. Lower = better calibrated.
 
 **EOS source:** `eos_final_rank` means ground truth is **end-of-season final rank** (playoff outcome when available), not just regular-season standings.
@@ -60,12 +64,12 @@ Overall: the ensemble is **learning** (non-trivial NDCG and Spearman, good upset
 |-------|------|----------|-------|-------|----------------|
 | **Ensemble** | 0.482 | 0.43 | 0.50 | 0.50 | 0.73 |
 | **Model A (DeepSet)** | 0.482 | 0.43 | 0.50 | 0.50 | 0.73 |
-| **XGB** | 0.149 | 0.52 | 0.14 | 0.14 | 0.79 |
-| **RF** | 0.05 | 0.31 | 0.07 | 0.20 | 0.82 |
+| **Model B (XGBoost)** | 0.149 | 0.52 | 0.14 | 0.14 | 0.79 |
+| **Model C (RF)** | 0.05 | 0.31 | 0.07 | 0.20 | 0.82 |
 
-- **Model A** matches the ensemble on NDCG/Spearman/MRR here because the stacked ensemble is dominated by Model A on this run/split.
-- **XGB** has higher Spearman (0.52) and better upset AUC (0.79) but much lower NDCG/MRR — so it correlates with strength but its **ordering** (especially top slots) is worse.
-- **RF** has the best upset AUC (0.82) but weakest ranking (NDCG 0.05, Spearman 0.31). So ensemble/Model A are carrying ranking; tree models add some signal for upsets/calibration.
+- **Model A** matches the ensemble on NDCG/Spearman/MRR here because the stacked ensemble is dominated by Model A on this run/split. (Terminology: Model B = XGBoost, Model C = Random Forest.)
+- **Model B** has higher Spearman (0.52) and better upset AUC (0.79) but much lower NDCG/MRR — so it correlates with strength but its **ordering** (especially top slots) is worse.
+- **Model C** has the best upset AUC (0.82) but weakest ranking (NDCG 0.05, Spearman 0.31). So ensemble/Model A are carrying ranking; tree models add some signal for upsets/calibration.
 
 ---
 

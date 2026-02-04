@@ -1,7 +1,7 @@
 """Run pipeline from build_db through explain.
 
 - 2_build_db: if raw file hashes match manifest and DB exists, skip rebuild; else rebuild.
-- run_leakage_tests, 3_train_model_a, 4_train_model_b, 4b_train_stacking, 6_run_inference, 5_evaluate, 5b_explain.
+- run_leakage_tests, 3_train_model_a, 4_train_models_b_and_c, 4b_train_stacking, 6_run_inference, 5_evaluate, 5b_explain.
 
 Runs in foreground; data loaders use in-process cache so the same DB is not reloaded within a step.
 """
@@ -27,7 +27,7 @@ def main() -> int:
         "2_build_db.py",           # conditional: skip if raw unchanged
         "run_leakage_tests.py",
         "3_train_model_a.py",
-        "4_train_model_b.py",
+        "4_train_models_b_and_c.py",
         "4b_train_stacking.py",
         "6_run_inference.py",
         "5_evaluate.py",

@@ -50,6 +50,8 @@
     "playoffs_player_logs_2025_26.parquet": "a926a7c4bbbcccd7c28db8fa13401f915253f2c7869f26a152f7f2e646358ce0"
   },
   "timestamps": {
-    "download": "1769979519.9332638"
-  }
+    "download": "1770148990.7615025"
+  },
+  "processed": "44475bcfb23159fac8497bcaa66baed779d5292b8774f3131c28b68b8f95a4c9",
+  "db_path": "data\\processed\\nba_build.duckdb"
 }

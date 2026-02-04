@@ -1,0 +1,24 @@
+# Baseline config for Phase 0 exploratory sweeps: max player features, wide hyperparameter ranges.
+# Extends defaults.yaml; override with: --config config/baseline_max_features.yaml
+
+# Inherit from defaults - this file overrides only the keys below.
+# When used with sweep, merge with defaults; sweep will override training/model_a/model_b as needed.
+
+training:
+  max_lists_oof: 100      # raise from 30 for fuller OOF
+  max_final_batches: 100  # raise from 50 for fuller final training
+
+# sweep.baseline ranges (used when --phase baseline)
+# Wide ranges for exploratory: epochs 8-28, max_depth 3-6, lr 0.05-0.12, n_xgb 200-350, n_rf 150-250
+sweep:
+  model_a_epochs: [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]  # full range
+  rolling_windows: [[10, 30]]
+  model_b:
+    max_depth: [3, 4, 5, 6]
+    learning_rate: [0.05, 0.08, 0.10, 0.12]
+    n_estimators_xgb: [200, 250, 300, 350]
+    n_estimators_rf: [150, 200, 250]
+    subsample: [0.8]
+    colsample_bytree: [0.7]
+    min_samples_leaf: [4, 5, 6]
+  include_clone_classifier: false
