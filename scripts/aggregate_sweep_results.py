@@ -131,8 +131,8 @@ def main() -> int:
             "ndcg4": "test_metrics_ensemble_ndcg_at_4",
             "ndcg16": "test_metrics_ensemble_ndcg_at_16",
             "ndcg20": "test_metrics_ensemble_ndcg_at_20",
-            "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank",
-            "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff",
+            "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_final_results",
+            "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff_final_results",
         }[args.objective]
         val = metrics.get(metric_key)
         if val is not None and isinstance(val, (int, float)) and math.isfinite(val):
@@ -166,9 +166,9 @@ def main() -> int:
     ndcg12_key = "test_metrics_ensemble_ndcg_at_12"
     ndcg16_key = "test_metrics_ensemble_ndcg_at_16"
     ndcg20_key = "test_metrics_ensemble_ndcg_at_20"
-    rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff"
-    rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff"
-    playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank"
+    rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff_final_results"
+    rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff_final_results"
+    playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_final_results"
 
     valid = [r for r in results if ensemble_key in r and r.get(ensemble_key) is not None]
     valid_optuna = [r for r in results if "value" in r and r.get("value") is not None]

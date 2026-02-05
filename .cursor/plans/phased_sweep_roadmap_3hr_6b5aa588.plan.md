@@ -34,6 +34,8 @@ All 4 baseline sweeps ran. See [outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md](outp
 
 **Phase 1 ranges (from optuna_importances):** Fix subsample, rolling_windows, colsample_bytree at default. Focus on: learning_rate, min_samples_leaf, n_estimators_rf, n_estimators_xgb, model_a_epochs, max_depth.
 
+**Rolling windows:** Keep fixed at `[10, 30]` for all phase1, baseline, phase1_xgb, phase2_rf sweeps. This maximizes batch cache hits (first trial builds, rest load from cache). Test different rolling windows **last** with `--phase rolling` after all 12 sweeps complete.
+
 ### Next steps (roadmap)
 
 1. **Commit and push** Phase 0 outputs (BASELINE_SWEEP_ANALYSIS.md, baseline_ndcg_playoff_outcome sweep results, aggregate script).
@@ -90,7 +92,7 @@ Use **minimal trials** (n_trials = 6 or 8) with **full min-max ranges** for all 
 | n_estimators_xgb | 200      | 350      | Few to many trees           |
 | n_estimators_rf  | 150      | 250      | Few to many trees           |
 | min_samples_leaf | 4        | 6        | Low to high regularization  |
-| rolling_windows  | [10, 30] | [10, 30] | Single value (max features) |
+| rolling_windows  | [10, 30] | [10, 30] | Fixed for phase1/baseline (batch cache); test [10], [15,30], [20,30] last with --phase rolling |
 
 
 **n_trials: 6 or 8** — enough to sample corners and midpoints; Optuna TPE will suggest diverse points within these bounds.
@@ -307,9 +309,18 @@ Per NBA playoff structure and [docs/HYPOTHESIZED_BEST_CONFIG_AND_METRIC_INSIGHTS
 
 ---
 
-## Phase 2 Planning (after Phase 1)
+## Rolling windows sweep (after Phase 1)
 
-After one sweep per (objective, listmle_target):
+After all 12 sweeps (6 objectives × 2 listmle_targets), run one sweep with `--phase rolling` to test:
+- `[10]`, `[10, 30]`, `[15, 30]`, `[20, 30]`
+
+Use the best objective and listmle_target from Phase 1. Batch cache will not hit across trials (rolling varies), so expect slightly longer per trial. Document best rolling window before Phase 2.
+
+---
+
+## Phase 2 Planning (after rolling sweep)
+
+After one sweep per (objective, listmle_target) and the rolling windows sweep:
 
 1. **Review**
   - Which objectives improved most with standings vs playoff?

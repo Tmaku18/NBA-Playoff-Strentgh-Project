@@ -11,7 +11,7 @@ January 28, 2026
 ## Overview
 This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Team Strength** using a Deep Set roster model plus a Hybrid tabular ensemble (XGBoost + Random Forest). The system targets **future outcomes** and identifies **Sleepers** versus **Paper Tigers** without circular evaluation.
 
-**Run 21 and Run 22** are baseline full-pipeline runs (not sweep-optimized for a single metric). **Run 21** was the first real success: Model A contributes (attention/contributors), ensemble ranking vs playoff outcome improved. **Run 22** (EOS source: eos_final_rank) achieved NDCG 0.48, Spearman 0.43, playoff Spearman 0.46 — better than early sweeps that optimized only Spearman. Neither run_021 nor run_022 was tuned for NDCG-only or Spearman-only; they used the same default config. **Sweep strategy:** Run separate Optuna sweeps with `--objective spearman`, `--objective ndcg4`, `--objective ndcg16`, `--objective ndcg20`, `--objective playoff_spearman`, or `--objective rank_rmse`, then compare best configs across objectives. From here on, **hyperparameter sweeps** and future test runs write to **`outputs3/`** (sweeps → `outputs3/sweeps/<batch_id>/`). See **`outputs/ANALYSIS.md`** and **`outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md`** for run comparisons and metric definitions.
+**Run 21 and Run 22** are baseline full-pipeline runs (not sweep-optimized for a single metric). **Run 21** was the first real success: Model A contributes (attention/contributors), ensemble ranking vs playoff outcome improved. **Run 22** (EOS source: eos_final_rank) achieved NDCG 0.48, Spearman 0.43, playoff Spearman 0.46 — better than early sweeps that optimized only Spearman. Neither run_021 nor run_022 was tuned for NDCG-only or Spearman-only; they used the same default config. **Sweep strategy:** Run separate Optuna sweeps with `--objective spearman`, `--objective ndcg4`, `--objective ndcg16`, `--objective ndcg20`, `--objective playoff_spearman`, or `--objective rank_rmse`, then compare best configs across objectives. **outputs3/** holds baseline and early Phase I sweeps. **outputs4/** is the Phase I sweep root (run_025+); use `--config config/outputs4_phase1.yaml` for sweeps there. See **`outputs/ANALYSIS.md`** and **`outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md`** for run comparisons and metric definitions. Sequential sweep commands: [.cursor/plans/outputs4_phase_i_sweeps_2638c514.plan.md](.cursor/plans/outputs4_phase_i_sweeps_2638c514.plan.md) §2.4.
 
 ---
 
@@ -51,7 +51,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - **Ranking:** NDCG, Spearman, MRR (mrr_top2 = champion+runner-up, mrr_top4 = conference finals), Precision@4, Precision@2 (planned). (Previously MRR used top_k=2 for two-conference “rank 1”).
 - **Future outcomes:** Brier score.
 - **Sleeper detection:** ROC-AUC on upsets (sleeper = actual rank worse than predicted rank); constant-label guard returns 0.5.
-- **Playoff metrics** (when playoff data and predictions include post_playoff_rank): Spearman (predicted global rank vs playoff performance rank), NDCG@4 (final four), NDCG@10, Brier score on championship odds (one-hot champion vs predicted odds), rank_mae and rank_rmse (predicted rank vs actual playoff rank; standings baselines when applicable). Section `playoff_metrics` in `eval_report.json`.
+- **Playoff metrics** (when playoff data and predictions include post_playoff_rank): Spearman (predicted global rank vs playoff_final_results), NDCG@4 (final four), NDCG@10, Brier score on championship odds (one-hot champion vs predicted odds), rank_mae and rank_rmse (pred vs playoff_final_results; eos_standings vs playoff_final_results baseline). Section `playoff_metrics` in `eval_report.json`.
 - **Report:** `eval_report.json` includes `notes` and, when applicable, `playoff_metrics`.
 - **Baselines:** rank-by-SRS, rank-by-Net-Rating, **Dummy** (e.g. previous-season rank or rank-by-net-rating).
 
@@ -64,8 +64,8 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - Classification: **Over-ranked**, **Under-ranked**, **Aligned**.
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
 - Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum). `contributors_are_fallback` indicates when attention weights were not usable.
-- **Plots:** `pred_vs_actual.png` — two panels (East/West), Predicted Conference Rank vs Actual Conference Rank (1–15); `pred_vs_playoff_rank.png` — predicted strength (global rank) vs playoff performance rank (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
-- **Report assets:** `outputs2/ANALYSIS.md` (run_020/021 analysis); **outputs3/** used for sweeps and future test runs.
+- **Plots:** `pred_vs_actual.png` — two panels (East/West), Predicted Conference Rank vs Actual Conference Rank (1–15); `pred_vs_playoff_final_results.png` — predicted strength (global rank) vs playoff_final_results (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
+- **Report assets:** `outputs2/ANALYSIS.md` (run_020/021 analysis); **outputs3/** baseline and early Phase I sweeps; **outputs4/** Phase I sweeps (run_025+).
 
 ---
 
@@ -86,7 +86,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 6. **Evaluation:** `python -m scripts.5_evaluate` — uses predictions from the latest (or configured) run_id → outputs dir `eval_report.json` (NDCG, Spearman, MRR, ROC-AUC upset).
 7. **Explainability:** `python -m scripts.5b_explain` (uses `config/defaults.yaml`) or `python -m scripts.5b_explain --config path/to/config.yaml` — SHAP on Model B → `shap_summary.png`; attention ablation and Integrated Gradients (Model A) when Captum is installed → `ig_model_a_attributions.txt`. Use `--config` to run explain on a **sweep best combo** (e.g. `outputs3/sweeps/<batch_id>/combo_0002/config.yaml`).
 8. **Clone classifier (optional):** `python -m scripts.4c_train_classifier_clone --config config/clone_classifier.yaml` — XGBoost binary classifier (playoff team vs not) on Train 2015–2022, Val 2023, Holdout 2024; outputs `clone_classifier_report.json` (AUC-ROC, Brier).
-9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5) per combo; writes to **`outputs3/sweeps/<batch_id>/`**. Use `--method optuna --n-trials N` for Bayesian tuning. **`--objective spearman|ndcg4|ndcg16|ndcg20|playoff_spearman|rank_rmse`** sets which metric Optuna optimizes (run separate sweeps for each objective and compare). After the sweep, **explain (5b_explain) runs automatically** on the best combo unless `--no-run-explain`. Use `--dry-run` to preview combos, `--max-combos N` to limit (grid only).
+9. **Hyperparameter sweep:** `python -m scripts.sweep_hparams` — Runs full pipeline (3, 4, 4b, 6, 5) per combo; writes to **`outputs3/sweeps/<batch_id>/`** or **`outputs4/sweeps/<batch_id>/`** when using `--config config/outputs4_phase1.yaml`. Use `--method optuna --n-trials N` for Bayesian tuning. **`--objective spearman|ndcg4|ndcg16|ndcg20|playoff_spearman|rank_rmse`** sets which metric Optuna optimizes (run separate sweeps for each objective and compare). Use semicolons in PowerShell to run sweeps sequentially; see [Outputs4 Phase I plan](.cursor/plans/outputs4_phase_i_sweeps_2638c514.plan.md) §2.4. After the sweep, **explain (5b_explain) runs automatically** on the best combo unless `--no-run-explain`. Use `--dry-run` to preview combos, `--max-combos N` to limit (grid only).
 
 **Optional:** `python -m scripts.run_manifest` (run manifest); `python -m scripts.run_leakage_tests` (before training); `python -m scripts.1b_download_injuries` (stub for injury data); `python -m scripts.1c_download_raptor` (RAPTOR CSV from FiveThirtyEight).
 
@@ -98,6 +98,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - **Phase baseline:** Use `--phase baseline` with wide ranges and few trials to quickly explore; narrow ranges and increase trials for Phase 1.
 - **Skip explain:** Use `--no-run-explain` to skip SHAP/IG on the best combo and save ~5–10 min per sweep.
 - **Config caps:** In `baseline_max_features.yaml`, lower `max_lists_oof` and `max_final_batches` (e.g. 50) for faster Model A training at the cost of coverage.
+- **Fixed rolling_windows:** Phase1, baseline, phase1_xgb, phase2_rf keep `rolling_windows: [10, 30]` only, maximizing batch cache hits. Test different rolling windows last with `--phase rolling` after main sweeps.
 
 **Built-in optimizations (automatic):**
 
@@ -129,13 +130,13 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 
 ## Report Assets (deliverables)
 
-All paths under the configured outputs dir (`outputs3/` for sweeps and new runs; `outputs2/` holds run_020/021). With `inference.run_id: null`, each pipeline run writes to a new folder (`outputs3/run_001/`, …); evaluation uses the latest run.
+All paths under the configured outputs dir. **outputs2/** holds run_020/021; **outputs3/** baseline and early Phase I sweeps; **outputs4/** Phase I sweeps (run_025+, use `config/outputs4_phase1.yaml`). With `inference.run_id: null`, each pipeline run writes to a new folder; evaluation uses the latest run.
 
 - `eval_report.json` — NDCG, Spearman, mrr_top2, mrr_top4, ROC-AUC upset, `notes`; per-model metrics (ensemble, model_a, xgb, rf); per-conference (predicted vs actual conference rank). When playoff data exists, `playoff_metrics`.
 - `outputs2/run_022/` — baseline run with EOS source `eos_final_rank`: NDCG 0.48, Spearman 0.43, playoff Spearman 0.46; not optimized for a single metric. See `outputs2/run_022/RESULTS_AND_OUTPUTS_EXPLAINED.md` and `outputs/ANALYSIS.md` for run_021/022 insights and sweep strategy.
 - `outputs/run_001/predictions.json` — per-team `predicted_strength` (rank), `conference_rank` (1–15), `championship_odds`, `ensemble_score` (0–1 percentile), `actual_conference_rank` (Actual Conference Rank), `EOS_global_rank` (1–30 when available), `post_playoff_rank`/`rank_delta_playoffs` (when playoff data exists), classification, ensemble diagnostics (model_agreement: High/Medium/Low), roster_dependence (attention + optional `ig_contributors`).
 - `outputs/run_001/pred_vs_actual.png` — two panels (East/West): predicted vs actual conference rank (1–15); grid lines, team-colored points, legend.
-- `outputs/run_001/pred_vs_playoff_rank.png` — predicted global rank (1–30) vs playoff performance rank (1–30).
+- `outputs/run_001/pred_vs_playoff_final_results.png` — predicted global rank (1–30) vs playoff_final_results (1–30).
 - `outputs/run_001/title_contender_scatter.png` — championship odds vs regular-season wins (proxy).
 - `outputs/run_001/odds_top10.png` — top-10 championship odds bar chart.
 - `outputs/shap_summary.png` — Model B (RF) SHAP summary on real team-context features (script 5b).

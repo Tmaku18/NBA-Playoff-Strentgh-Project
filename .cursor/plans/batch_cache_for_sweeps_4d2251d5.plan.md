@@ -11,6 +11,8 @@ isProject: false
 
 Save built lists and batches to disk and reuse them when the same config (listmle_target, rolling_windows, train_seasons, DB, etc.) is used again. This applies within a sweep (all trials share the same batches when only model hyperparams like epochs/lr differ) and across runs (e.g. rerunning the same sweep or running a different objective with the same listmle_target). No code changes to the sweep script are required beyond script 3 and config; the sweep already passes `--config` per trial.
 
+**Fixed rolling_windows:** Phase1, baseline, phase1_xgb, phase2_rf sweeps keep `rolling_windows: [10, 30]` only. This maximizes cache hits (first trial builds, rest load). Test different rolling windows last with `--phase rolling`.
+
 ## When batches are reusable
 
 Batches are identical when all of the following match:

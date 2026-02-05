@@ -151,10 +151,10 @@ def _compute_metrics(teams: list, *, k: int = 10) -> dict:
     """Compute ndcg, spearman, mrr, roc_auc_upset and optionally playoff_metrics from teams list."""
     y_actual, y_score, pred_ranks_arr, _, _ = _teams_to_arrays(teams)
     m = _compute_metrics_from_arrays(y_actual, y_score, pred_ranks_arr, k=k)
-    # Rank-distance metrics: predicted rank vs actual EOS playoff rank (lower is better)
-    m["rank_mae_pred_vs_playoff"] = float(rank_mae(pred_ranks_arr, y_actual))
-    m["rank_rmse_pred_vs_playoff"] = float(rank_rmse(pred_ranks_arr, y_actual))
-    # Standings vs actual playoff rank (baseline: how far reg-season rank was from playoff outcome)
+    # Rank-distance metrics: predicted rank vs playoff_final_results (lower is better)
+    m["rank_mae_pred_vs_playoff_final_results"] = float(rank_mae(pred_ranks_arr, y_actual))
+    m["rank_rmse_pred_vs_playoff_final_results"] = float(rank_rmse(pred_ranks_arr, y_actual))
+    # eos_standings vs playoff_final_results (baseline: how far reg-season rank was from playoff outcome)
     standings_list = []
     actual_list = []
     for t in teams:
@@ -164,8 +164,8 @@ def _compute_metrics(teams: list, *, k: int = 10) -> dict:
             actual_list.append(float(act))
             standings_list.append(float(stand))
     if len(actual_list) >= 16:
-        m["rank_mae_standings_vs_playoff"] = float(rank_mae(np.array(standings_list), np.array(actual_list)))
-        m["rank_rmse_standings_vs_playoff"] = float(rank_rmse(np.array(standings_list), np.array(actual_list)))
+        m["rank_mae_eos_standings_vs_playoff_final_results"] = float(rank_mae(np.array(standings_list), np.array(actual_list)))
+        m["rank_rmse_eos_standings_vs_playoff_final_results"] = float(rank_rmse(np.array(standings_list), np.array(actual_list)))
     playoff_rows = []
     for t in teams:
         p_rank = t.get("analysis", {}).get("post_playoff_rank")
@@ -180,14 +180,14 @@ def _compute_metrics(teams: list, *, k: int = 10) -> dict:
         odds_pct = np.array([float(r[2].rstrip("%")) / 100.0 for r in playoff_rows], dtype=np.float32)
         champion_onehot = (p_rank == 1).astype(np.float32)
         m["playoff_metrics"] = {
-            "spearman_pred_vs_playoff_rank": float(spearman(p_rank, g_rank)),
+            "spearman_pred_vs_playoff_final_results": float(spearman(p_rank, g_rank)),
             "ndcg_at_4_final_four": float(ndcg_at_4(p_rank, -g_rank)),
-            "ndcg10_pred_vs_playoff": float(ndcg_at_10(p_rank, -g_rank)),
+            "ndcg10_pred_vs_playoff_final_results": float(ndcg_at_10(p_rank, -g_rank)),
             "brier_championship_odds": float(brier_champion(champion_onehot, odds_pct)),
-            "rank_mae_pred_vs_playoff": m["rank_mae_pred_vs_playoff"],
-            "rank_rmse_pred_vs_playoff": m["rank_rmse_pred_vs_playoff"],
-            "rank_mae_standings_vs_playoff": m.get("rank_mae_standings_vs_playoff", float("nan")),
-            "rank_rmse_standings_vs_playoff": m.get("rank_rmse_standings_vs_playoff", float("nan")),
+            "rank_mae_pred_vs_playoff_final_results": m["rank_mae_pred_vs_playoff_final_results"],
+            "rank_rmse_pred_vs_playoff_final_results": m["rank_rmse_pred_vs_playoff_final_results"],
+            "rank_mae_eos_standings_vs_playoff_final_results": m.get("rank_mae_eos_standings_vs_playoff_final_results", float("nan")),
+            "rank_rmse_eos_standings_vs_playoff_final_results": m.get("rank_rmse_eos_standings_vs_playoff_final_results", float("nan")),
         }
     return m
 
@@ -376,8 +376,8 @@ def main():
 
     if report.get("test_metrics_ensemble", {}).get("playoff_metrics"):
         report["notes"]["playoff_metrics"] = (
-            "Spearman (pred global vs playoff rank), NDCG@4 (final four), Brier (champion vs odds). "
-            "rank_mae/rank_rmse: mean absolute and root mean squared error of rank vs actual EOS playoff rank (pred and standings baselines)."
+            "Spearman (pred global vs playoff_final_results), NDCG@4 (final four), Brier (champion vs odds). "
+            "rank_mae/rank_rmse: pred vs playoff_final_results; eos_standings vs playoff_final_results (baseline)."
         )
 
     # Write to run_dir to preserve per-run (never overwrite previous run's report)

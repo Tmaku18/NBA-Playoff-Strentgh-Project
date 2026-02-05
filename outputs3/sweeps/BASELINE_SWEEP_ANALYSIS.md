@@ -15,6 +15,7 @@ This document analyzes the Phase 0 baseline exploratory sweeps and compares resu
    - Use **n_jobs=4** (4 parallel workers).
    - Use **no timeout** — let the sweep run until completion.
    - **Phase 1 robust settings:** n_trials=12, --no-run-explain — keeps each objective batch (2 sweeps + analysis) under 4 hours.
+   - **Phase 1 run_id:** All phase1 and phase1_xgb sweeps use run_024; `.current_run` and outputs are named run_024 in each combo.
 
 3. **After each sweep**
    - Update this document with results, best combo, and interpretation.
@@ -113,7 +114,7 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 �
 | rolling_windows | 0.00 |
 | colsample_bytree | 0.00 |
 
-**Phase 1 planning:** Fix subsample, rolling_windows, colsample_bytree at default; focus search on learning_rate, min_samples_leaf, n_estimators_rf/xgb, model_a_epochs, max_depth.
+**Phase 1 planning:** Fix subsample, rolling_windows, colsample_bytree at default; focus search on learning_rate, min_samples_leaf, n_estimators_rf/xgb, model_a_epochs, max_depth. **Rolling windows** are fixed at [10, 30] for phase1/baseline (batch cache); test [10], [10,30], [15,30], [20,30] last with `--phase rolling`.
 
 ---
 
@@ -222,6 +223,57 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 �
 
 ---
 
+## Sweep: phase1_spearman_final_rank
+
+**Configuration:**
+- **Objective:** spearman (maximize)
+- **listmle_target:** final_rank (train on EOS standings)
+- **Phase:** phase1 (narrowed ranges: epochs 14–26, max_depth 3–5, lr 0.06–0.10, n_xgb 200–300, n_rf 150–230)
+- **n_trials:** 20 (16 succeeded, 4 failed)
+- **n_jobs:** 4
+- **rolling_windows:** fixed [10, 30]
+
+### Best combo (by spearman): combo 10
+
+| Param | Value |
+|-------|-------|
+| model_a_epochs | 21 |
+| max_depth | 5 |
+| learning_rate | 0.0704 |
+| n_estimators_xgb | 291 |
+| n_estimators_rf | 164 |
+| min_samples_leaf | 4 |
+
+### Best combo metrics vs baseline / run_022
+
+| Metric | phase1_spearman_final_rank (combo 10) | baseline_spearman_final_rank | run_022 |
+|--------|--------------------------------------|------------------------------|---------|
+| **Spearman** | 0.499 | 0.492 | 0.430 |
+| **playoff_spearman** | 0.518 | 0.499 | 0.461 |
+| **NDCG** | 0.485 | 0.483 | 0.482 |
+| **NDCG@4** | 0.473 | 0.464 | — |
+| **rank_mae_pred_vs_playoff** | 6.73 | 6.80 | 7.53 |
+| **rank_rmse_pred_vs_playoff** | 8.67 | 8.72 | 9.24 |
+| **ROC-AUC upset** | 0.759 | 0.777 | 0.728 |
+
+**Interpretation:** Phase 1 spearman + final_rank improves over baseline spearman_final_rank on Spearman (+0.007), playoff_spearman (+0.019), rank_mae (−0.07), and rank_rmse (−0.05). Beats run_022 by a wide margin on all metrics. West conference (NDCG 0.749, Spearman 0.56) much stronger than East (NDCG 0.33, Spearman 0.34).
+
+### Optuna parameter importance
+
+| Param | Importance |
+|-------|------------|
+| n_estimators_rf | 0.26 |
+| n_estimators_xgb | 0.21 |
+| learning_rate | 0.21 |
+| model_a_epochs | 0.19 |
+| max_depth | 0.13 |
+| min_samples_leaf | 0.008 |
+| subsample, rolling_windows, colsample_bytree | 0 |
+
+**Next:** Run phase1_spearman_playoff_outcome (same objective, listmle_target=playoff_outcome).
+
+---
+
 ## Standings vs playoff target comparison
 
 | Sweep | listmle_target | Best spearman | Best ndcg | Best playoff_spearman | rank_mae |
@@ -230,6 +282,7 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 �
 | baseline_spearman_playoff_outcome | playoff_outcome | **0.512** | 0.483 | **0.513** | **6.67** |
 | baseline_ndcg_final_rank | final_rank | 0.483 | **0.486** | 0.511 | 6.93 |
 | baseline_ndcg_playoff_outcome | playoff_outcome | 0.485 | **0.486** | 0.504 | **6.80** |
+| phase1_spearman_final_rank | final_rank | 0.499 | 0.485 | 0.518 | 6.73 |
 
 ---
 

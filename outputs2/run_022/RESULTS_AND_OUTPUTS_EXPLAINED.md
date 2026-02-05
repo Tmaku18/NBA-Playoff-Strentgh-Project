@@ -13,7 +13,7 @@ This document explains what each output file is, what each metric means, and how
 | **eval_report.json** | Script 5 (evaluate) | Full evaluation report: ensemble + Model A / Model B / Model C metrics, by-conference, playoff metrics, notes. When multiple test seasons exist, the **summary** metrics in the report are from the **last** test season (2024-25). |
 | **eval_report_2023-24.json**, **eval_report_2024-25.json** | Script 5 | Per-season metrics so you can compare 2023-24 vs 2024-25. |
 | **ANALYSIS_01.md** | Script 5 | Short human-readable summary: run id, EOS source, and test metrics (ensemble) from the report. |
-| **pred_vs_actual_*.png**, **pred_vs_playoff_rank_*.png** | Script 6 / 5 | Scatter plots: predicted strength/rank vs actual EOS/playoff rank, per season. |
+| **pred_vs_actual_*.png**, **pred_vs_playoff_final_results_*.png** | Script 6 / 5 | Scatter plots: predicted strength/rank vs actual EOS/playoff_final_results, per season. |
 | **eos_playoff_standings_vs_eos_global_rank_*.png** | Script 6 | EOS playoff standings vs EOS global rank. |
 | **odds_top10_*.png**, **title_contender_scatter_*.png** | Script 6 | Championship odds and contender scatter, per season. |
 

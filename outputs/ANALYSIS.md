@@ -49,7 +49,7 @@ Within each conference, Spearman is **negative** while global Spearman is **+0.7
 
 ### Playoff metrics
 
-- **run_016** (and run_014/015) test snapshot has **no post_playoff_rank** data (test date 2025-04-13 is in 2024-25; playoffs had not started). So `eval_report.json` has no `playoff_metrics`. When playoff data exists (≥16 teams with post_playoff_rank), the report will include Spearman pred vs playoff rank, NDCG@4 final four, and Brier championship odds.
+- **run_016** (and run_014/015) test snapshot has **no post_playoff_rank** data (test date 2025-04-13 is in 2024-25; playoffs had not started). So `eval_report.json` has no `playoff_metrics`. When playoff data exists (≥16 teams with post_playoff_rank), the report will include Spearman pred vs playoff_final_results, NDCG@4 final four, and Brier championship odds.
 
 #### Why is there no playoff data?
 
@@ -81,8 +81,8 @@ We run **one objective per Optuna sweep** and compare best configs across object
 
 - **`--objective spearman`** — maximize `test_metrics_ensemble_spearman` (global ordering).
 - **`--objective ndcg`** — maximize `test_metrics_ensemble_ndcg` (top-heavy ranking).
-- **`--objective playoff_spearman`** — maximize `test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank` (pred vs playoff outcome).
-- **`--objective rank_mae`** — minimize `test_metrics_ensemble_rank_mae_pred_vs_playoff` (rank distance).
+- **`--objective playoff_spearman`** — maximize `test_metrics_ensemble_playoff_spearman_pred_vs_playoff_final_results` (pred vs playoff_final_results).
+- **`--objective rank_mae`** — minimize `test_metrics_ensemble_rank_mae_pred_vs_playoff_final_results` (rank distance).
 
 Example: run four sweeps (e.g. with `--n-trials 10` each), then compare the best combo from each in `sweep_results_summary.json` and `sweep_results.csv`. After each sweep, **5b_explain** runs automatically on the best combo for that objective (unless `--no-run-explain`). Use `python -m scripts.5b_explain --config <sweeps_dir>/<batch_id>/combo_<NNNN>/config.yaml` to explain any combo manually.
 

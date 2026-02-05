@@ -723,7 +723,7 @@ def run_inference_from_db(
             fig.savefig(out / f"pred_vs_actual{fig_suffix}.png", bbox_inches="tight")
             plt.close()
 
-            # pred_vs_playoff_rank: global rank (1-30) vs playoff performance rank (1-30)
+            # pred_vs_playoff_final_results: global rank (1-30) vs playoff_final_results (1-30)
             # Legend outside so all points visible; East = circle (o), West = diamond (D); color coordinated
             if playoff_rank_map:
                 fig2, ax2 = plt.subplots(figsize=(10, 6))
@@ -734,7 +734,7 @@ def run_inference_from_db(
                     ax2.set_ylabel("Predicted global rank (1-30)")
                     ax2.set_title("Predicted global rank vs playoff performance rank")
                     ax2.grid(True, linestyle="--", alpha=0.7)
-                    fig2.savefig(out / f"pred_vs_playoff_rank{fig_suffix}.png", bbox_inches="tight")
+                    fig2.savefig(out / f"pred_vs_playoff_final_results{fig_suffix}.png", bbox_inches="tight")
                     plt.close(fig2)
                 else:
                     east_pts = [(p_rank, g_rank, name) for (p_rank, g_rank, name, conf) in pts if conf == "E"]
@@ -754,7 +754,7 @@ def run_inference_from_db(
                     ax2.set_xlim(-0.5, max_r)
                     ax2.set_ylim(-0.5, max_r)
                     fig2.tight_layout(rect=[0, 0, 0.72, 1])
-                    fig2.savefig(out / f"pred_vs_playoff_rank{fig_suffix}.png", bbox_inches="tight")
+                    fig2.savefig(out / f"pred_vs_playoff_final_results{fig_suffix}.png", bbox_inches="tight")
                     plt.close(fig2)
 
             # Championship odds top-10 bar chart

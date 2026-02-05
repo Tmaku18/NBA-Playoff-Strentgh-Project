@@ -50,7 +50,7 @@ model_a:
   early_stopping_val_frac: 0.25
   minutes_bias_weight: 0.3
   minutes_sum_min: 1.0e-6
-  attention_debug: true
+  attention_debug: false  # set true when debugging attention collapse; false for faster training
   # When raw attention collapses (nearly zero on valid positions): "minutes" or "uniform"
   attention_fallback_strategy: "minutes"
   # Automatic Mixed Precision (AMP) for faster training on CUDA; loss stays float32. Set false if numerical issues.
@@ -92,7 +92,7 @@ training:
 
 output:
   true_strength_scale: "percentile"  # or softmax, platt
-  odds_temperature: 1.0  # softmax temperature for championship odds
+  odds_temperature: 0.5  # softmax temperature for championship odds (lower = sharper)
   championship_odds_method: "softmax"  # or "monte_carlo"
   ig_inference_top_k: 1  # per conference; set 0 to disable IG in predictions.json
   ig_inference_steps: 50

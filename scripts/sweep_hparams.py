@@ -201,7 +201,7 @@ def _run_one_combo(
     combo_out = combo_dir / "outputs"
     combo_out.mkdir(parents=True, exist_ok=True)
     cfg = copy.deepcopy(config)
-    if phase == "phase1":
+    if phase in ("phase1", "phase1_xgb", "rolling"):
         cfg.setdefault("inference", {})["run_id"] = "run_024"
         cfg.setdefault("inference", {})["run_id_base"] = 24
     cfg["training"] = cfg.get("training", {})
@@ -261,8 +261,8 @@ def main() -> int:
         "--phase",
         type=str,
         default="full",
-        choices=("full", "phase1", "phase1_xgb", "phase2_rf", "baseline"),
-        help="full=config grid; phase1=narrowed Optuna ranges for Phase 1; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges for exploratory (Optuna only)",
+        choices=("full", "phase1", "phase1_xgb", "phase2_rf", "baseline", "rolling"),
+        help="full=config grid; phase1=narrowed Optuna ranges; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges; rolling=test rolling_windows last (after main sweeps)",
     )
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
     parser.add_argument(
@@ -318,8 +318,10 @@ def main() -> int:
         min_leaf_list = [min_leaf_list]
 
     # Phased Model B grids (refined sweep plan): override lists when --phase is set
+    # Rolling windows: fix at [10, 30] for phase1/baseline to maximize batch cache hits; test alternatives last with --phase rolling.
     if phase == "phase1_xgb":
         # Phase 1 (XGB local): max_depth=4 fixed; lr {0.08, 0.10, 0.12}; n_xgb {250, 300, 350}; subsample=0.8; colsample=0.8; RF fixed
+        rolling_list = [[10, 30]]  # fixed for batch cache
         epochs_list = list(range(8, 29))  # 8–28 step 1
         max_depth_list = [4]
         lr_list = [0.08, 0.10, 0.12]
@@ -330,6 +332,7 @@ def main() -> int:
         min_leaf_list = [5]
     elif phase == "phase2_rf":
         # Phase 2 (RF local): XGB fixed (d=4, lr=0.10, n_xgb=300, sub=0.8, col=0.8); RF n_estimators {150, 200, 250}; min_leaf {4, 5, 6}
+        rolling_list = [[10, 30]]  # fixed for batch cache
         epochs_list = list(range(8, 29))
         max_depth_list = [4]
         lr_list = [0.10]
@@ -340,6 +343,7 @@ def main() -> int:
         min_leaf_list = [4, 5, 6]
     elif phase == "phase1":
         # Phase 1 (narrowed): from optuna_importances; focus on high-impact params
+        rolling_list = [[10, 30]]  # fixed for batch cache
         epochs_list = list(range(14, 27))  # 14-26
         max_depth_list = [3, 4, 5]
         lr_list = [0.06, 0.08, 0.10]
@@ -350,11 +354,23 @@ def main() -> int:
         min_leaf_list = [4, 5, 6]
     elif phase == "baseline":
         # Phase 0 (baseline): wide ranges for exploratory sweeps; smallest combo covering widest range
+        rolling_list = [[10, 30]]  # fixed for batch cache
         epochs_list = list(range(8, 29))  # 8-28
         max_depth_list = [3, 4, 5, 6]
         lr_list = [0.05, 0.08, 0.10, 0.12]
         n_xgb_list = [200, 250, 300, 350]
         n_rf_list = [150, 200, 250]
+        subsample_list = [0.8]
+        colsample_list = [0.7]
+        min_leaf_list = [4, 5, 6]
+    elif phase == "rolling":
+        # Final phase: test different rolling windows after all other sweeps (batch cache will not hit across trials)
+        rolling_list = [[10], [10, 30], [15, 30], [20, 30]]
+        epochs_list = list(range(14, 27))  # same as phase1
+        max_depth_list = [3, 4, 5]
+        lr_list = [0.06, 0.08, 0.10]
+        n_xgb_list = list(range(200, 301))
+        n_rf_list = list(range(150, 231))
         subsample_list = [0.8]
         colsample_list = [0.7]
         min_leaf_list = [4, 5, 6]
@@ -368,8 +384,8 @@ def main() -> int:
             "ndcg4": "test_metrics_ensemble_ndcg_at_4",
             "ndcg16": "test_metrics_ensemble_ndcg_at_16",
             "ndcg20": "test_metrics_ensemble_ndcg_at_20",
-            "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank",
-            "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff",
+            "playoff_spearman": "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_final_results",
+            "rank_rmse": "test_metrics_ensemble_rank_rmse_pred_vs_playoff_final_results",
         }
         metric_key = _OBJECTIVE_KEYS[args.objective]
         direction = "minimize" if args.objective == "rank_rmse" else "maximize"
@@ -391,6 +407,7 @@ def main() -> int:
                 max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf, include_clone,
                 val_frac=val_frac,
                 listmle_target=listmle_target,
+                phase=phase,
             )
             if "error" in metrics:
                 print(f"  FAILED: {metrics['error']}", flush=True)
@@ -692,9 +709,9 @@ def main() -> int:
     ndcg12_key = "test_metrics_ensemble_ndcg_at_12"
     ndcg16_key = "test_metrics_ensemble_ndcg_at_16"
     ndcg20_key = "test_metrics_ensemble_ndcg_at_20"
-    rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff"
-    rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff"
-    playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_rank"
+    rank_mae_key = "test_metrics_ensemble_rank_mae_pred_vs_playoff_final_results"
+    rank_rmse_key = "test_metrics_ensemble_rank_rmse_pred_vs_playoff_final_results"
+    playoff_spearman_key = "test_metrics_ensemble_playoff_spearman_pred_vs_playoff_final_results"
     valid = [r for r in results if ensemble_key in r and r.get(ensemble_key) is not None]
     valid_optuna = [r for r in results if "value" in r and r.get("value") is not None]
     valid_mae = [

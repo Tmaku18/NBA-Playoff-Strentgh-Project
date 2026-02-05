@@ -23,8 +23,11 @@ todos:
   - id: sweep-rank-rmse
     content: Run phase1_rank_rmse sweeps; analyze; update docs
     status: pending
+  - id: sweep-rolling
+    content: Run phase1_rolling sweep (test [10], [10,30], [15,30], [20,30]) after all 12 sweeps; analyze
+    status: pending
   - id: phase2-plan
-    content: Create PHASE2_SWEEP_PLAN.md after all Phase 1 sweeps complete
+    content: Create PHASE2_SWEEP_PLAN.md after rolling sweep complete
     status: pending
 isProject: false
 ---
@@ -55,9 +58,10 @@ Executable plan derived from [.cursor/plans/phased_sweep_roadmap_3hr_6b5aa588.pl
 ### Robustness tactics
 
 1. **n_trials=12** — Guarantees completion even if trials run 25–30 min each.
-2. `**--no-run-explain**` — Skip SHAP/IG on best combo; run `5b_explain` manually after sweep if needed.
+2. **--no-run-explain** — Skip SHAP/IG on best combo; run `5b_explain` manually after sweep if needed.
 3. **Aggregate on interruption** — If sweep stops early (Wi‑Fi, Ctrl+C), run `aggregate_sweep_results.py` to build summary from completed combos.
 4. **Optional fast config** — If trials regularly exceed 25 min, use lower `max_lists_oof` / `max_final_batches` in config (trade: fewer lists, faster Model A).
+5. **Fixed rolling_windows [[10, 30]]** — Phase1, baseline, phase1_xgb, phase2_rf all use `rolling_windows: [10, 30]` only. This keeps the batch cache key stable so all trials hit the cache after the first (saves ~1–3 min per trial). Test different rolling windows **last** with `--phase rolling`.
 
 ### If trials run faster (15 min avg)
 
@@ -159,9 +163,22 @@ Only after both sweeps (final_rank and playoff_outcome) for the current objectiv
 
 ---
 
-## Step 5: Phase 2 planning (after all 12 sweeps)
+## Step 5: Rolling windows sweep (after all 12 sweeps)
 
-1. Review which objective + listmle_target performed best on each metric
+After all 6 objectives × 2 listmle_targets are complete, run a **rolling windows** sweep to test alternatives to [10, 30]:
+
+```powershell
+# Use best objective (e.g. spearman) and best listmle_target from Phase 1
+python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-run-explain --objective spearman --listmle-target playoff_outcome --phase rolling --batch-id phase1_rolling_spearman_playoff_outcome --config config/baseline_max_features.yaml
+```
+
+**Options tested:** `[10]`, `[10, 30]`, `[15, 30]`, `[20, 30]`. Batch cache will not hit across trials (rolling_windows varies), so expect ~1–3 min extra per trial vs cached runs. Analyze and document best rolling window.
+
+---
+
+## Step 6: Phase 2 planning (after rolling sweep)
+
+1. Review which objective + listmle_target + rolling_windows performed best on each metric
 2. Use optuna_importances to decide Phase 2 search ranges
 3. Create `.cursor/plans/PHASE2_SWEEP_PLAN.md` with narrowed ranges and objectives
 

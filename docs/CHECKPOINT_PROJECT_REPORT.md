@@ -57,7 +57,7 @@ This project builds a multi-modal stacking ensemble to predict NBA team strength
 ### 2.5 Stacking and inference
 
 - **Stacking:** K-fold OOF from Model A and Model B (XGB, RF) are pooled; RidgeCV fits level-2 weights on OOF ranks/scores. See `src.models.stacking`, script `4b_train_stacking`.
-- **Inference:** Script 6 loads DB, Model A checkpoint, Model B artifacts, and meta-learner; computes ensemble score and predicted strength (rank 1–30); writes `predictions.json`, per-season prediction files, and plots (pred_vs_actual, pred_vs_playoff_rank, eos_playoff_standings_vs_eos_global_rank, title_contender_scatter, etc.).
+- **Inference:** Script 6 loads DB, Model A checkpoint, Model B artifacts, and meta-learner; computes ensemble score and predicted strength (rank 1–30); writes `predictions.json`, per-season prediction files, and plots (pred_vs_actual, pred_vs_playoff_final_results, eos_playoff_standings_vs_eos_global_rank, title_contender_scatter, etc.).
 
 ### 2.6 Anti-leakage rules
 
