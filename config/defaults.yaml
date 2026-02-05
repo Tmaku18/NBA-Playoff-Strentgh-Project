@@ -24,6 +24,9 @@ paths:
   raw: "data/raw"
   processed: "data/processed"
   outputs: "outputs3"
+  # When set, script 3 caches built batches (lists, oof_batches, all_batches) keyed by config+DB.
+  # Reuse on cache hit to save ~1-3 min per sweep trial. null = use data/processed/batch_cache.
+  batch_cache: null
 
 # Skip rebuilding DB if file already exists (saves existing DB; set false to force rebuild from raw)
 build_db:
@@ -50,6 +53,8 @@ model_a:
   attention_debug: true
   # When raw attention collapses (nearly zero on valid positions): "minutes" or "uniform"
   attention_fallback_strategy: "minutes"
+  # Automatic Mixed Precision (AMP) for faster training on CUDA; loss stays float32. Set false if numerical issues.
+  use_amp: true
 
 model_b:
   xgb:

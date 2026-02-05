@@ -148,11 +148,16 @@ def train_epoch(
     *,
     grad_clip_max_norm: float = 1.0,
     attention_debug: bool = False,
+    use_amp: bool = False,
+    scaler: "torch.cuda.amp.GradScaler | None" = None,
 ) -> float:
     model.train()
     total = 0.0
     n = 0
     first_batch = True
+    amp_enabled = use_amp and device.type == "cuda" and torch.cuda.is_available()
+    use_scaler = amp_enabled and scaler is not None
+
     for batch in batches:
         B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
         embs = batch["embedding_indices"].to(device).reshape(B * K, P)
@@ -188,12 +193,33 @@ def train_epoch(
                 )
             first_batch = False
 
-        score, _, _ = model(embs, stats, minutes, mask)
-        score = score.reshape(B, K)
+        optimizer.zero_grad(set_to_none=True)
+        if amp_enabled:
+            with torch.autocast(device_type="cuda", dtype=torch.float16):
+                score, _, _ = model(embs, stats, minutes, mask)
+            score = score.float().reshape(B, K)
+        else:
+            score, _, _ = model(embs, stats, minutes, mask)
+            score = score.reshape(B, K)
         score = torch.nan_to_num(score, nan=0.0, posinf=10.0, neginf=-10.0)
         loss = listmle_loss(score, rel)
-        optimizer.zero_grad()
-        if torch.isfinite(loss).all():
+        if not torch.isfinite(loss).all():
+            continue
+        if use_scaler:
+            scaler.scale(loss).backward()
+            if attention_debug and n == 0:
+                grad_norm_before = _grad_norm_for_module(model)
+                print(
+                    "Grad norm before clip (first batch):",
+                    f"grad_norm={grad_norm_before:.4f}",
+                    f"max_norm={grad_clip_max_norm}",
+                    flush=True,
+                )
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_max_norm)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
             loss.backward()
             if attention_debug and n == 0:
                 grad_norm_before = _grad_norm_for_module(model)
@@ -205,8 +231,8 @@ def train_epoch(
                 )
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_max_norm)
             optimizer.step()
-            total += loss.item()
-            n += 1
+        total += loss.item()
+        n += 1
     return total / n if n else 0.0
 
 
@@ -214,10 +240,13 @@ def eval_epoch(
     model: nn.Module,
     batches: list[dict],
     device: torch.device,
+    *,
+    use_amp: bool = False,
 ) -> float:
     model.eval()
     total = 0.0
     n = 0
+    amp_enabled = use_amp and device.type == "cuda" and torch.cuda.is_available()
     with torch.no_grad():
         for batch in batches:
             B, K, P, S = batch["embedding_indices"].shape[0], batch["embedding_indices"].shape[1], batch["embedding_indices"].shape[2], batch["player_stats"].shape[-1]
@@ -227,8 +256,13 @@ def eval_epoch(
             mask = batch["key_padding_mask"].to(device).reshape(B * K, P)
             rel = batch["rel"].to(device)
 
-            score, _, _ = model(embs, stats, minutes, mask)
-            score = score.reshape(B, K)
+            if amp_enabled:
+                with torch.autocast(device_type="cuda", dtype=torch.float16):
+                    score, _, _ = model(embs, stats, minutes, mask)
+                score = score.float().reshape(B, K)
+            else:
+                score, _, _ = model(embs, stats, minutes, mask)
+                score = score.reshape(B, K)
             score = torch.nan_to_num(score, nan=0.0, posinf=10.0, neginf=-10.0)
             loss = listmle_loss(score, rel)
             if torch.isfinite(loss).all():
@@ -349,6 +383,8 @@ def train_model_a_on_batches(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
     attention_debug = bool(ma.get("attention_debug", False))
+    use_amp = bool(ma.get("use_amp", False)) and device.type == "cuda" and torch.cuda.is_available()
+    scaler = torch.cuda.amp.GradScaler() if use_amp else None
     epochs = int(max_epochs) if max_epochs is not None else int(ma.get("epochs", 20))
     patience = int(ma.get("early_stopping_patience", 3))
     min_delta = float(ma.get("early_stopping_min_delta", 0.0))
@@ -366,6 +402,8 @@ def train_model_a_on_batches(
             device,
             grad_clip_max_norm=grad_clip_max_norm,
             attention_debug=attention_debug,
+            use_amp=use_amp,
+            scaler=scaler,
         )
         print(f"epoch {epoch+1} loss={loss:.4f}", flush=True)
         if loss < best_train_loss:
@@ -383,7 +421,7 @@ def train_model_a_on_batches(
                     pass
             break
         if use_early:
-            val_loss = eval_epoch(model, val_batches or [], device)
+            val_loss = eval_epoch(model, val_batches or [], device, use_amp=use_amp)
             if val_loss + min_delta < best_val:
                 best_val = val_loss
                 best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
@@ -421,6 +459,8 @@ def train_model_a(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
     attention_debug = bool(ma.get("attention_debug", False))
+    use_amp = bool(ma.get("use_amp", False)) and device.type == "cuda" and torch.cuda.is_available()
+    scaler = torch.cuda.amp.GradScaler() if use_amp else None
 
     if batches is None:
         batches = [get_dummy_batch(4, 10, 15, stat_dim, num_emb, device) for _ in range(5)]
@@ -462,7 +502,7 @@ def train_model_a(
                     pass
             break
         if use_early:
-            val_loss = eval_epoch(model, val_batches, device)
+            val_loss = eval_epoch(model, val_batches, device, use_amp=use_amp)
             print(f"val_loss {epoch+1}: {val_loss:.4f}", flush=True)
             if val_loss + min_delta < best_val:
                 best_val = val_loss

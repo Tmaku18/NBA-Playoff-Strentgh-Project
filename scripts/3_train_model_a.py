@@ -1,5 +1,7 @@
 """Train Model A (DeepSet + ListMLE) on real DB data. Option A: K-fold OOF, then final model."""
 import argparse
+import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -9,6 +11,74 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 import yaml
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
+def _compute_batch_cache_key(config: dict, db_path: Path) -> str:
+    """Compute SHA256-based cache key from config + DB identity (path, mtime, size)."""
+    training = config.get("training", {})
+    model_a = config.get("model_a", {})
+    key_data = {
+        "listmle_target": training.get("listmle_target"),
+        "rolling_windows": tuple(training.get("rolling_windows", [10, 30])),
+        "train_seasons": tuple(sorted(training.get("train_seasons", []))),
+        "max_lists_oof": training.get("max_lists_oof", 30),
+        "max_final_batches": training.get("max_final_batches", 50),
+        "n_folds": training.get("n_folds", 5),
+        "roster_size": training.get("roster_size", 15),
+        "use_prior_season_baseline": training.get("use_prior_season_baseline", False),
+        "prior_season_lookback_days": training.get("prior_season_lookback_days", 365),
+        "stat_dim": model_a.get("stat_dim"),
+        "num_embeddings": model_a.get("num_embeddings", 500),
+        "db_path": str(db_path.resolve()),
+    }
+    stat = db_path.stat() if db_path.exists() else None
+    if stat:
+        key_data["db_mtime"] = stat.st_mtime
+        key_data["db_size"] = stat.st_size
+    js = json.dumps(key_data, sort_keys=True, default=str)
+    return hashlib.sha256(js.encode()).hexdigest()[:16]
+
+
+def _resolve_batch_cache_dir(config: dict) -> Path | None:
+    """Resolve batch cache directory; return None if caching disabled."""
+    p = config.get("paths", {}).get("batch_cache")
+    if p is None or (isinstance(p, str) and p.strip().lower() in ("null", "")):
+        p = ROOT / "data" / "processed" / "batch_cache"
+    path = Path(p)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path
+
+
+def _move_batches_to_device(batches: list, device) -> None:
+    """Move tensor values in batch dicts to device (in place)."""
+    if torch is None:
+        return
+    for b in batches:
+        for k, v in list(b.items()):
+            if isinstance(v, torch.Tensor):
+                b[k] = v.to(device)
+
+
+def _copy_batches_to_cpu(batches: list) -> list:
+    """Return shallow copy of batches with tensors moved to CPU (for cache save)."""
+    if torch is None:
+        return batches
+    out = []
+    for b in batches:
+        nb = {}
+        for k, v in b.items():
+            if isinstance(v, torch.Tensor):
+                nb[k] = v.cpu().clone()
+            else:
+                nb[k] = v
+        out.append(nb)
+    return out
 
 
 def _next_run_id(outputs_dir: Path, run_id_base: int | None = None) -> str:
@@ -239,8 +309,26 @@ def main():
 
     import torch
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Building batches for OOF...", flush=True)
-    batches, list_metas = build_batches_from_lists(oof_lists, games, tgl, teams, pgl, config, device=device)
+    batches = None
+    list_metas = None
+    all_batches = None
+
+    cache_dir = _resolve_batch_cache_dir(config)
+    cache_key = _compute_batch_cache_key(config, db_path) if cache_dir else None
+    cache_file = (cache_dir / f"{cache_key}.pt") if cache_dir and cache_key else None
+
+    if cache_file and cache_file.exists():
+        print(f"Batch cache hit: {cache_file.name}", flush=True)
+        payload = torch.load(cache_file, map_location="cpu")
+        batches = payload.get("oof_batches", [])
+        list_metas = payload.get("list_metas", [])
+        all_batches = payload.get("all_batches", [])
+        _move_batches_to_device(batches, device)
+        _move_batches_to_device(all_batches, device)
+
+    if batches is None or list_metas is None:
+        print("Building batches for OOF...", flush=True)
+        batches, list_metas = build_batches_from_lists(oof_lists, games, tgl, teams, pgl, config, device=device)
 
     if not batches or not list_metas:
         print(
@@ -254,6 +342,40 @@ def main():
         path = train_model_a(config, out, batches=all_batches)
         print(f"Saved {path} (no oof_model_a.parquet)")
         return
+
+    # On cache miss: build all_batches and save to cache
+    if all_batches is None:
+        all_lists_for_cache = train_lists
+        max_final = config.get("training", {}).get("max_final_batches", 50)
+        if len(all_lists_for_cache) > max_final:
+            step = max(1, len(all_lists_for_cache) // max_final)
+            idx = sorted(
+                range(len(all_lists_for_cache)),
+                key=lambda i: (all_lists_for_cache[i]["as_of_date"], all_lists_for_cache[i].get("conference", "")),
+            )[::step][:max_final]
+            all_lists_for_cache = [all_lists_for_cache[i] for i in sorted(idx)]
+        all_batches, _ = build_batches_from_lists(
+            all_lists_for_cache, games, tgl, teams, pgl, config, device=device
+        )
+        if not all_batches:
+            all_batches = build_batches_from_db(
+                games, tgl, teams, pgl, config,
+                playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+            )
+        if cache_dir and cache_key and all_batches:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "split_info": split_info,
+                "oof_lists": oof_lists,
+                "all_lists": all_lists_for_cache,
+                "oof_batches": _copy_batches_to_cpu(batches),
+                "list_metas": list_metas,
+                "all_batches": _copy_batches_to_cpu(all_batches),
+            }
+            tmp = cache_dir / f".{cache_key}.tmp"
+            torch.save(payload, tmp)
+            tmp.rename(cache_dir / f"{cache_key}.pt")
+            print(f"Batch cache saved: {cache_key}.pt", flush=True)
 
     # Time-based fold split: sort by as_of_date, chunk into n_folds (within train only)
     sorted_indices = sorted(range(len(oof_lists)), key=lambda i: (oof_lists[i]["as_of_date"], oof_lists[i].get("conference", "")))
@@ -298,21 +420,22 @@ def main():
     else:
         print("No OOF rows collected (every fold had empty train or val batches).", file=sys.stderr)
 
-    # Final model: use train lists only, cap batch count for feasible runtime
-    all_lists = train_lists
-    max_final = config.get("training", {}).get("max_final_batches", 50)
-    if len(all_lists) > max_final:
-        step = max(1, len(all_lists) // max_final)
-        idx = sorted(range(len(all_lists)), key=lambda i: (all_lists[i]["as_of_date"], all_lists[i].get("conference", "")))[::step][:max_final]
-        all_lists = [all_lists[i] for i in sorted(idx)]
-        print(f"Final model: training on {len(all_lists)} lists (subsampled from {len(train_lists)} train)", flush=True)
-    print("Building final batches...", flush=True)
-    all_batches, _ = build_batches_from_lists(all_lists, games, tgl, teams, pgl, config, device=device)
-    if not all_batches:
-        all_batches = build_batches_from_db(
-            games, tgl, teams, pgl, config,
-            playoff_games=playoff_games, playoff_tgl=playoff_tgl,
-        )
+    # Final model: use cached all_batches if available (from batch cache), else build
+    if all_batches is None:
+        all_lists = train_lists
+        max_final = config.get("training", {}).get("max_final_batches", 50)
+        if len(all_lists) > max_final:
+            step = max(1, len(all_lists) // max_final)
+            idx = sorted(range(len(all_lists)), key=lambda i: (all_lists[i]["as_of_date"], all_lists[i].get("conference", "")))[::step][:max_final]
+            all_lists = [all_lists[i] for i in sorted(idx)]
+            print(f"Final model: training on {len(all_lists)} lists (subsampled from {len(train_lists)} train)", flush=True)
+        print("Building final batches...", flush=True)
+        all_batches, _ = build_batches_from_lists(all_lists, games, tgl, teams, pgl, config, device=device)
+        if not all_batches:
+            all_batches = build_batches_from_db(
+                games, tgl, teams, pgl, config,
+                playoff_games=playoff_games, playoff_tgl=playoff_tgl,
+            )
     path = train_model_a(config, out, batches=all_batches)
     print(f"Saved {path}")
 

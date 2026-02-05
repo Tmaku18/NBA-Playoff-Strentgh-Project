@@ -57,6 +57,7 @@ def _run_one_combo_worker(
     include_clone: bool,
     val_frac: float,
     listmle_target: str | None = None,
+    phase: str = "full",
 ) -> dict:
     """Top-level worker for ProcessPoolExecutor; runs one combo and returns metrics or error."""
     return _run_one_combo(
@@ -75,6 +76,7 @@ def _run_one_combo_worker(
         include_clone,
         val_frac=val_frac,
         listmle_target=listmle_target,
+        phase=phase,
     )
 
 
@@ -191,6 +193,7 @@ def _run_one_combo(
     include_clone: bool,
     val_frac: float = 0.25,
     listmle_target: str | None = None,
+    phase: str = "full",
 ) -> dict:
     """Run one pipeline (3, 4, 4b, 6, 5) with given params; return metrics dict or error."""
     combo_dir = batch_dir / f"combo_{combo_idx:04d}"
@@ -198,6 +201,9 @@ def _run_one_combo(
     combo_out = combo_dir / "outputs"
     combo_out.mkdir(parents=True, exist_ok=True)
     cfg = copy.deepcopy(config)
+    if phase == "phase1":
+        cfg.setdefault("inference", {})["run_id"] = "run_024"
+        cfg.setdefault("inference", {})["run_id_base"] = 24
     cfg["training"] = cfg.get("training", {})
     cfg["training"]["rolling_windows"] = list(rolling_windows)
     if listmle_target is not None:
@@ -481,6 +487,7 @@ def main() -> int:
                 md, lr_v, nx, nr, sub, col, mleaf, include_clone,
                 val_frac=val_frac,
                 listmle_target=listmle_target,
+                phase=phase,
             )
             if "error" in m and m["error"] == "Inference":
                 print("Sweep aborted: inference failed. Exiting.", flush=True)
@@ -571,6 +578,7 @@ def main() -> int:
                     max_depth, lr, n_xgb, n_rf, subsample, colsample, min_leaf, include_clone,
                     val_frac=val_frac,
                     listmle_target=listmle_target,
+                    phase=phase,
                 )
                 if "error" in metrics:
                     print(f"  FAILED at {metrics['error']}", flush=True)
@@ -643,6 +651,7 @@ def main() -> int:
                         batch_dir, i, config, list(rw), ep, md, lr_v, nx, nr, sub, col, mleaf,
                         include_clone, val_frac,
                         listmle_target,
+                        phase,
                     )
                     futures[fut] = (i, c)
                 for fut in concurrent.futures.as_completed(futures):

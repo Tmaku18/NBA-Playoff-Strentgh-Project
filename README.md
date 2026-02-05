@@ -23,6 +23,7 @@ This project builds a **Multi-Modal Stacking Ensemble** to predict NBA **True Te
 - **Game-level ListMLE:** lists per conference-date/week; **torch.logsumexp** and input clamping for numerical stability; gradient clipping in Model A training; hash-trick embeddings for new players.
 - **Model A training:** epochs configurable via `model_a.epochs` with optional validation-based early stopping (`early_stopping_*` in `defaults.yaml`). Learning rate and gradient clipping are configurable (`model_a.learning_rate`, `model_a.grad_clip_max_norm`). Set attention uses **σReparam** on Q/K/V projections (Zhai et al., [arXiv:2303.06296](https://arxiv.org/abs/2303.06296)) to bound attention logits and reduce entropy collapse.
 - **Model A and attention collapse:** If training stops with "Model A is not learning" (flat loss), see [.cursor/plans/Attention_Report.md](.cursor/plans/Attention_Report.md) for investigation steps, references, and diagnostics. Enable `model_a.attention_debug: true` to log encoder/Z/scores, gradient norms, relevance, and player_stats; try different `learning_rate` or `grad_clip_max_norm` (e.g. 5.0) if flat loss may be due to over-clipping.
+- **Model A AMP:** Automatic Mixed Precision (AMP) is enabled by default on CUDA (`model_a.use_amp: true`) for faster training; the ListMLE loss stays in float32. Disable with `model_a.use_amp: false` if numerical issues appear.
 - **Attention analysis:** [docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md](docs/ANALYSIS_OF_ATTENTION_WEIGHTS.md) — walkthrough of Model A attention, first working inference (run_023), key inferences (star-dominant vs. distributed), and a framework for tracking hyperparameters → metrics by model and conference. Updated with each run/sweep for comprehensive analysis by project end.
 - **Season config:** Hard-coded season date ranges in `defaults.yaml` to avoid play-in ambiguity.
 - **Explainability:** SHAP on Model B only; Integrated Gradients or permutation ablation for Model A.
@@ -97,6 +98,15 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - **Phase baseline:** Use `--phase baseline` with wide ranges and few trials to quickly explore; narrow ranges and increase trials for Phase 1.
 - **Skip explain:** Use `--no-run-explain` to skip SHAP/IG on the best combo and save ~5–10 min per sweep.
 - **Config caps:** In `baseline_max_features.yaml`, lower `max_lists_oof` and `max_final_batches` (e.g. 50) for faster Model A training at the cost of coverage.
+
+**Built-in optimizations (automatic):**
+
+| Optimization | What it does | Speed effect |
+|--------------|--------------|--------------|
+| **AMP (Model A)** | Automatic Mixed Precision: model forward runs in float16 on CUDA; loss stays float32. Config: `model_a.use_amp: true` (default). | ~20–35% faster per epoch; ~1–2.5 min saved per trial on GPU. |
+| **Batch cache (script 3)** | Caches built lists and batches (keyed by config + DB); reused when same listmle_target, rolling_windows, train_seasons, etc. Config: `paths.batch_cache` (default `data/processed/batch_cache`). | First trial builds; subsequent trials skip list/batch building → ~1–3 min saved per trial. 12-trial sweep: ~11–33 min saved. |
+
+**Combined effect:** A 12-trial sweep that used to take ~3 hours may complete in ~2–2.5 hours (~15–35% faster) with AMP + batch cache enabled on CUDA.
 
 **Perfect run checklist (workspace or worktree):**
 - **DB:** `config.paths.db` must point to an existing DuckDB with `playoff_games` and `playoff_team_game_logs` (or set `inference.require_eos_final_rank: false` to allow standings-only).
