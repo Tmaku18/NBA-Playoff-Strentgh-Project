@@ -1,0 +1,19 @@
+{
+  "best_value": -Infinity,
+  "best_params": {
+    "rolling_windows": [
+      10,
+      30
+    ],
+    "model_a_epochs": 18,
+    "max_depth": 5,
+    "learning_rate": 0.09357267107679461,
+    "n_estimators_xgb": 280,
+    "n_estimators_rf": 166,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_samples_leaf": 6
+  },
+  "n_trials": 12,
+  "objective": "spearman"
+}

@@ -1,0 +1,9 @@
+{
+  "batch_id": "phase1_spearman_playoff_outcome",
+  "method": "optuna",
+  "n_combos": 12,
+  "n_jobs": 4,
+  "config_outputs": "C:\\Users\\tmaku\\OneDrive\\Documents\\GSU\\Advanced Machine Learning\\NBA Playoff Strentgh Project\\outputs4",
+  "val_frac": 0.25,
+  "phase": "phase1"
+}

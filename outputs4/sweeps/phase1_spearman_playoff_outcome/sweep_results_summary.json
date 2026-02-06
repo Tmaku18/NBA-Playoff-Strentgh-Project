@@ -1,0 +1,18 @@
+{
+  "best_optuna_trial": {
+    "combo": 0,
+    "value": -Infinity,
+    "rolling_windows": [
+      10,
+      30
+    ],
+    "model_a_epochs": 15,
+    "max_depth": 3,
+    "learning_rate": 0.08381822925518599,
+    "n_estimators_xgb": 296,
+    "n_estimators_rf": 226,
+    "subsample": 0.8,
+    "colsample_bytree": 0.7,
+    "min_samples_leaf": 5
+  }
+}
