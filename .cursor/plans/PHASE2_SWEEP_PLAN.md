@@ -24,15 +24,15 @@ python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-ru
 
 ### Inputs from Phase 1 (outputs3)
 
-**Best config (phase1_spearman_final_rank combo 10):**
-- model_a_epochs: 21
+**Best config (phase1_spearman_final_rank combo 10 + rolling sweep combo 7):**
+- model_a_epochs: 21 (or 24 from rolling best)
 - max_depth: 5
-- learning_rate: 0.0704
-- n_estimators_xgb: 291
-- n_estimators_rf: 164
-- min_samples_leaf: 4
+- learning_rate: 0.0704 (or 0.086 from rolling best)
+- n_estimators_xgb: 291 (or 204 from rolling best)
+- n_estimators_rf: 164 (or 226 from rolling best)
+- min_samples_leaf: 4 (or 5 from rolling best)
 - subsample: 0.8, colsample_bytree: 0.7
-- rolling_windows: [10, 30] (or best from rolling sweep)
+- **rolling_windows: [15, 30]** ← from rolling sweep (combo 7 best: Spearman 0.496, playoff_spearman 0.501)
 
 **Optuna importances (phase1_spearman_final_rank):**
 - n_estimators_rf: 0.26
@@ -48,7 +48,7 @@ python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-ru
 1. **Fix low-importance params** at Phase 1 best or default:
    - subsample: 0.8
    - colsample_bytree: 0.7
-   - rolling_windows: best from rolling sweep (or [10, 30])
+   - **rolling_windows: [15, 30]** (from rolling sweep — clearly best)
    - min_samples_leaf: 4 (or narrow to 4–5)
 
 2. **Narrow high-importance params** around Phase 1 best:
@@ -72,10 +72,11 @@ python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-ru
 
 ## Execution Order
 
-1. **Rolling sweep** — phase1_rolling_spearman_final_rank
-2. **Analyze rolling** — Document best rolling_windows; update config
-3. **Phase 2 sweep** — Add phase2 ranges to sweep_hparams; run spearman + final_rank
-4. **Compare** — Phase 2 best vs Phase 1 best vs run_022
+1. ~~**Rolling sweep** — phase1_rolling_spearman_final_rank~~ **Done.**
+2. ~~**Analyze rolling** — Document best rolling_windows; update config~~ **Done.** Best: [15, 30]. See `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md`.
+3. **Phase 2.1 (coarse)** — Run `--phase phase2` spearman + final_rank; ~15 trials. See [PHASE2_GRANULAR_SWEEP_PLAN.md](PHASE2_GRANULAR_SWEEP_PLAN.md).
+4. **Phase 2.2 (fine)** — Run `--phase phase2_fine` around Phase 2.1 best; ~10 trials.
+5. **Compare** — Phase 2 best vs Phase 1 best vs run_022
 
 ---
 
@@ -83,9 +84,10 @@ python -m scripts.sweep_hparams --method optuna --n-trials 12 --n-jobs 4 --no-ru
 
 | File | Change |
 |------|--------|
-| `scripts/sweep_hparams.py` | **Done.** `phase2` added with narrowed ranges (epochs 18–24, lr 0.06–0.08, n_xgb 270–310, n_rf 150–180, max_depth 4–5, min_leaf 4–5) |
+| `scripts/sweep_hparams.py` | **Done.** `phase2` (coarse) + `phase2_fine` added. phase2: rolling [15,30], epochs 20–24, lr 0.065–0.09, n_xgb 200–300, n_rf 150–230, max_depth 5, min_leaf 5. phase2_fine: narrower. |
+| `.cursor/plans/PHASE2_GRANULAR_SWEEP_PLAN.md` | **Done.** Granular sub-phases, evidence summary, execution order. |
 | `config/outputs4_phase1.yaml` | Optionally add `sweep.phase2` section with phase2 ranges |
-| `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md` | Add rolling sweep results and Phase 2 best after runs |
+| `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md` | **Done.** Rolling sweep results and inferences added |
 
 ---
 

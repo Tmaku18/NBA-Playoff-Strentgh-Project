@@ -57,6 +57,21 @@ Standings-trained baseline sweep **outperformed** run_022 (playoff_outcome) on S
 
 **Phase 1 finding:** final_rank (standings) target **outperformed** playoff_outcome on spearman, playoff_spearman, rank_mae, rank_rmse — opposite of Phase 0. Full analysis: `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md`.
 
+### Rolling windows sweep (outputs4 phase1_rolling_spearman_final_rank)
+
+**Sweep:** spearman + final_rank; Optuna varied rolling_windows among [10], [10, 30], [15, 30], [20, 30].
+
+| Rolling windows | Best Spearman | Inference |
+|-----------------|---------------|-----------|
+| [10] | 0.407 | Single L10 — worst; loses longer-term context |
+| [10, 30] | 0.468 | L10 adds noise; weakest dual option |
+| **[15, 30]** | **0.496** | **Best** — balances recent form (15) and seasonal context (30) |
+| [20, 30] | 0.489 | Competitive; more conservative |
+
+**Best combo (7):** rolling_windows [15, 30], Spearman 0.496, playoff_spearman 0.501, rank_mae 6.73.
+
+**Recommendation:** Use **rolling_windows: [15, 30]** for Phase 2 and production.
+
 ### Hypothesized (pre-sweep expectations)
 
 | Objective              | Best model (expected) | Rationale                                                                 |

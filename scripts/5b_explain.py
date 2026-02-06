@@ -137,7 +137,8 @@ def main():
                     minutes_sum_min=float(ma.get("minutes_sum_min", 1e-6)),
                 )
                 if "model_state" in ck:
-                    model.load_state_dict(ck["model_state"])
+                    from src.inference.predict import _state_dict_for_load
+                    model.load_state_dict(_state_dict_for_load(ck["model_state"]), strict=True)
                 model = model.to(device)
                 model.eval()
                 batch = batches_a[0]

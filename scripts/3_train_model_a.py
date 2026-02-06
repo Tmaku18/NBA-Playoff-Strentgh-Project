@@ -1,4 +1,12 @@
 """Train Model A (DeepSet + ListMLE) on real DB data. Option A: K-fold OOF, then final model."""
+import os
+
+# Set thread count for PyTorch/numpy before importing torch (helps CPU parallelism)
+if "OMP_NUM_THREADS" not in os.environ:
+    os.environ["OMP_NUM_THREADS"] = "14"
+if "MKL_NUM_THREADS" not in os.environ:
+    os.environ["MKL_NUM_THREADS"] = "14"
+
 import argparse
 import hashlib
 import json
@@ -97,9 +105,15 @@ def _next_run_id(outputs_dir: Path, run_id_base: int | None = None) -> str:
 
 
 def _reserve_run_id(outputs_dir: Path, config: dict) -> None:
-    """Reserve the next run_id for this pipeline run so script 6 uses the same folder."""
-    run_id_base = config.get("inference", {}).get("run_id_base")
-    run_id = _next_run_id(outputs_dir, run_id_base=run_id_base)
+    """Reserve the next run_id for this pipeline run so script 6 uses the same folder.
+    When inference.run_id is explicitly set (e.g. run_024 for phase1), use it directly."""
+    inf = config.get("inference") or {}
+    run_id = inf.get("run_id")
+    if run_id and isinstance(run_id, str) and re.match(r"^run_\d+$", run_id.strip(), re.I):
+        run_id = run_id.strip()
+    else:
+        run_id_base = inf.get("run_id_base")
+        run_id = _next_run_id(outputs_dir, run_id_base=run_id_base)
     path = outputs_dir / ".current_run"
     path.write_text(run_id.strip(), encoding="utf-8")
 

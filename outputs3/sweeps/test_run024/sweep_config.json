@@ -1,0 +1,9 @@
+{
+  "batch_id": "test_run024",
+  "method": "optuna",
+  "n_combos": 1,
+  "n_jobs": 1,
+  "config_outputs": "C:\\Users\\tmaku\\OneDrive\\Documents\\GSU\\Advanced Machine Learning\\NBA Playoff Strentgh Project\\outputs3",
+  "val_frac": 0.25,
+  "phase": "phase1"
+}

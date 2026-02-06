@@ -12,6 +12,13 @@ import pandas as pd
 import torch
 
 
+def _state_dict_for_load(state: dict | None) -> dict:
+    """Strip torch.compile _orig_mod. prefix so checkpoint saved from compiled model loads into plain model."""
+    if not state:
+        return state or {}
+    return {k.replace("_orig_mod.", "", 1): v for k, v in state.items()}
+
+
 def load_models(
     model_a_path: str | Path | None = None,
     xgb_path: str | Path | None = None,
@@ -31,7 +38,7 @@ def load_models(
         attn_cfg = ma.get("attention", {})
         embed_dim = int(ma.get("embedding_dim", 32))
         # Infer stat_dim from checkpoint to match trained model (avoids config/checkpoint mismatch)
-        state = ck.get("model_state", ck) if isinstance(ck, dict) else {}
+        state = _state_dict_for_load(ck.get("model_state", ck) if isinstance(ck, dict) else {})
         if "enc.mlp.0.weight" in state:
             enc_in = state["enc.mlp.0.weight"].shape[1]
             stat_dim = int(enc_in) - embed_dim
@@ -53,7 +60,7 @@ def load_models(
             attention_use_residual=bool(attn_cfg.get("use_residual", True)),
         )
         if "model_state" in ck:
-            model_a.load_state_dict(ck["model_state"])
+            model_a.load_state_dict(_state_dict_for_load(ck["model_state"]), strict=True)
         model_a.eval()
 
     if xgb_path and Path(xgb_path).exists():

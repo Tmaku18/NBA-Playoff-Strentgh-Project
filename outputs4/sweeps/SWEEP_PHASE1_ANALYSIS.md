@@ -87,15 +87,56 @@ Analysis of Phase 1 hyperparameter sweeps. **outputs3** sweeps completed success
 
 ---
 
-## outputs4 Status
+## Rolling Windows Sweep Results (outputs4 phase1_rolling_spearman_final_rank)
 
-outputs4 sweeps (phase1_spearman_*, phase1_ndcg4_*) failed with TritonMissing on Windows. Fix applied: `torch.compile` is skipped when `sys.platform == "win32"` in `src/training/train_model_a.py`. Re-run outputs4 sweeps on WSL (Linux) or Windows after the fix to populate outputs4 with run_025+.
+**Sweep:** spearman objective, listmle_target=final_rank; Optuna varied rolling_windows among [10], [10, 30], [15, 30], [20, 30] plus other hparams. 12 trials.
+
+### Performance by Rolling Window
+
+| Rolling windows | Combos | Spearman range | Interpretation |
+|-----------------|--------|----------------|----------------|
+| **(10,)** | 5 | 0.407 | Single L10 window — **worst**; loses longer-term context |
+| **(10, 30)** | 9, 10 | 0.421–0.468 | Dual window; L10 too short, adds noise |
+| **(15, 30)** | 4, 6, 7, 8 | 0.470–**0.496** | **Best** — balances recent form (15) and seasonal context (30) |
+| **(20, 30)** | 0, 1, 2, 3, 11 | 0.451–0.489 | Competitive; more conservative (less recent-games weight) |
+
+### Best combo (combo 7): rolling_windows [15, 30]
+
+| Param | Value |
+|-------|-------|
+| rolling_windows | **[15, 30]** |
+| model_a_epochs | 24 |
+| max_depth | 5 |
+| learning_rate | 0.086 |
+| n_estimators_xgb | 204 |
+| n_estimators_rf | 226 |
+| min_samples_leaf | 5 |
+
+| Metric | Best (combo 7) |
+|--------|----------------|
+| **Spearman** | **0.496** |
+| **playoff_spearman** | **0.501** |
+| **rank_mae_pred_vs_playoff_final_results** | **6.73** |
+| **rank_rmse_pred_vs_playoff_final_results** | **8.69** |
+| **NDCG** | 0.490 |
+
+### Inferences
+
+1. **Single short window [10] is clearly worse** — Spearman 0.407; dual-window setups outperform.
+2. **[15, 30] is best** — Highest mean and peak Spearman; combo 7 best across Spearman, playoff_spearman, rank_mae, rank_rmse.
+3. **[20, 30] competitive** — Combo 3 best NDCG (0.532); combo 11 best NDCG@4 (0.473); slightly more conservative.
+4. **[10, 30] weakest dual option** — L10 adds noise; 15- or 20-game short window preferred.
+
+**Recommendation:** Use **rolling_windows: [15, 30]** for Phase 2 and production configs.
 
 ---
 
-## Next: Rolling Sweep and Phase 2
+## outputs4 Status
 
-Per [phased_sweep_execution_plan](.cursor/plans/phased_sweep_execution_plan_d0f3e0a3.plan.md):
+outputs4 sweeps: **phase1_rolling_spearman_final_rank** completed successfully (post-Triton fix). phase1_spearman_*, phase1_ndcg4_* may have partial or Triton-affected results; re-run on WSL or after Triton fix if needed.
 
-1. **Rolling windows sweep** — Test [10], [10,30], [15,30], [20,30] with best objective (spearman) and listmle_target (final_rank from Phase 1).
-2. **Phase 2** — Narrow ranges around high-importance params; fix low-importance; run focused sweeps. See `.cursor/plans/PHASE2_SWEEP_PLAN.md`.
+---
+
+## Next: Phase 2
+
+1. **Phase 2 sweep** — Use rolling_windows **[15, 30]** (from rolling sweep); narrow ranges around Phase 1 best. See `.cursor/plans/PHASE2_SWEEP_PLAN.md`.

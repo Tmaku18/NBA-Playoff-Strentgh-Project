@@ -50,8 +50,8 @@
     "playoffs_player_logs_2025_26.parquet": "a926a7c4bbbcccd7c28db8fa13401f915253f2c7869f26a152f7f2e646358ce0"
   },
   "timestamps": {
-    "download": "1770148990.7615025"
+    "download": "1770348999.3105466"
   },
-  "processed": "44475bcfb23159fac8497bcaa66baed779d5292b8774f3131c28b68b8f95a4c9",
-  "db_path": "data\\processed\\nba_build.duckdb"
+  "processed": "8ab91b4b2c93d88f082de77c40bc968b909c53f192a2e41a5308d24e31685bd2",
+  "db_path": "C:/Users/tmaku/OneDrive/Documents/GSU/Advanced Machine Learning/NBA Playoff Strentgh Project/data/processed/nba_build.duckdb"
 }

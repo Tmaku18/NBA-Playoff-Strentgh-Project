@@ -1,11 +1,11 @@
 {
   "param_importances": {
-    "model_a_epochs": 0.45285457487481323,
-    "n_estimators_rf": 0.229189815239654,
-    "learning_rate": 0.16962310630640795,
-    "n_estimators_xgb": 0.10352575138553663,
-    "max_depth": 0.026072500546109646,
-    "min_samples_leaf": 0.018734251647478408,
+    "n_estimators_rf": 0.26324359032021855,
+    "n_estimators_xgb": 0.20982160364506755,
+    "learning_rate": 0.20527873787271025,
+    "model_a_epochs": 0.18883535416053096,
+    "max_depth": 0.1250920161143036,
+    "min_samples_leaf": 0.007728697887169108,
     "subsample": 0.0,
     "rolling_windows": 0.0,
     "colsample_bytree": 0.0

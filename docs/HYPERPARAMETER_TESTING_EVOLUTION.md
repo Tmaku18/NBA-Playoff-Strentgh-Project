@@ -181,6 +181,28 @@ So **default combo count** is much smaller (e.g. 8) for a feasible end-to-end te
 
 ---
 
+### 2.11 Rolling windows sweep (phase1_rolling_spearman_final_rank)
+
+**Source:** `outputs4/sweeps/phase1_rolling_spearman_final_rank`, `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md`
+
+**Context:** Phase 1 Optuna sweeps kept `rolling_windows` fixed at [10, 30] for batch cache hits. A dedicated rolling sweep (`--phase rolling`) varied rolling_windows among [10], [10, 30], [15, 30], [20, 30] with spearman + final_rank.
+
+**Findings:**
+
+| rolling_windows | Best Spearman | Inference |
+|-----------------|---------------|-----------|
+| [10] | 0.407 | Single L10 — worst; loses longer-term context |
+| [10, 30] | 0.468 | L10 adds noise; weakest dual option |
+| **[15, 30]** | **0.496** | Best — balances recent form (15) and seasonal context (30) |
+| [20, 30] | 0.489 | Competitive; more conservative |
+
+**Decision:** Use **rolling_windows: [15, 30]** for Phase 2 and production configs. Phase 2 sweeps fix rolling_windows at [15, 30].
+
+**Pros:** Data-driven choice; [15, 30] clearly outperforms [10, 30] default; dual-window setups outperform single-window.  
+**Cons:** Only 12 Optuna trials; [15, 30] not exhaustively compared to e.g. [12, 30] or [15, 25].
+
+---
+
 ## 3. Methodology Summary Table
 
 | Method        | How it works | Best for | Speed vs full grid | Pros | Cons |
@@ -288,7 +310,7 @@ Outputs (per batch): `sweep_results.csv`, `sweep_results_summary.json`, `sweep_c
 ## 6. Document History and Related Files
 
 - **Plans:** `.cursor/plans/model_a_attention_fix_and_phased_roadmap_1e5c219f.plan.md`, `refined_sweep_rerun_bc8afb8f.plan.md`, `outputs2_run_019_sweeps_update8_d5fca612.plan.md`, `sweep_rerun_+_attention_check_7aa587c2.plan.md`, `Attention_Report.md`, `Performance_trajectory_and_hyperparameters.md`.
-- **Sweep analysis:** `outputs2/sweeps/SWEEP_ANALYSIS_REPORT.md`.
+- **Sweep analysis:** `outputs2/sweeps/SWEEP_ANALYSIS_REPORT.md`, `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md` (Phase 1 + rolling).
 - **Implementation:** `scripts/sweep_hparams.py`, `config/defaults.yaml` (sweep section).
 - **README:** `README.md` (sweep usage and outputs3).
 

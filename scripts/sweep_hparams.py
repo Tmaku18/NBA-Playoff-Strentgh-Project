@@ -201,9 +201,12 @@ def _run_one_combo(
     combo_out = combo_dir / "outputs"
     combo_out.mkdir(parents=True, exist_ok=True)
     cfg = copy.deepcopy(config)
-    if phase in ("phase1", "phase1_xgb", "phase2", "rolling"):
+    if phase in ("phase1", "phase1_xgb", "rolling"):
         cfg.setdefault("inference", {})["run_id"] = "run_024"
         cfg.setdefault("inference", {})["run_id_base"] = 24
+    elif phase in ("phase2", "phase2_fine"):
+        cfg.setdefault("inference", {})["run_id"] = "run_025"
+        cfg.setdefault("inference", {})["run_id_base"] = 25
     cfg["training"] = cfg.get("training", {})
     cfg["training"]["rolling_windows"] = list(rolling_windows)
     if listmle_target is not None:
@@ -261,8 +264,8 @@ def main() -> int:
         "--phase",
         type=str,
         default="full",
-        choices=("full", "phase1", "phase1_xgb", "phase2", "phase2_rf", "baseline", "rolling"),
-        help="full=config grid; phase1=narrowed Optuna ranges; phase2=narrowed post-Phase1; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges; rolling=test rolling_windows",
+        choices=("full", "phase1", "phase1_xgb", "phase2", "phase2_fine", "phase2_rf", "baseline", "rolling"),
+        help="full=config grid; phase1=narrowed Optuna ranges; phase2=coarse refinement; phase2_fine=fine refinement; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges; rolling=test rolling_windows",
     )
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
     parser.add_argument(
@@ -375,16 +378,28 @@ def main() -> int:
         colsample_list = [0.7]
         min_leaf_list = [4, 5, 6]
     elif phase == "phase2":
-        # Phase 2 (narrowed): from Phase 1 optuna_importances; fix low-importance params
-        rolling_list = [[10, 30]]  # or use best from rolling sweep
-        epochs_list = list(range(18, 25))  # 18-24, center 21
-        max_depth_list = [4, 5]
-        lr_list = [0.06, 0.07, 0.08]
-        n_xgb_list = list(range(270, 311))  # 270-310
-        n_rf_list = list(range(150, 181))  # 150-180
+        # Phase 2.1 (coarse): from Phase 1 + rolling analysis; fix low-importance params
+        # rolling [15, 30] from rolling sweep; min_leaf 5 from Optuna low-importance
+        rolling_list = [[15, 30]]
+        epochs_list = list(range(20, 25))  # 20-24, center 22
+        max_depth_list = [5]  # both Phase 1 and rolling best used 5
+        lr_list = [0.065, 0.07, 0.075, 0.08, 0.085, 0.09]  # captures 0.0704 and 0.086
+        n_xgb_list = list(range(200, 301))  # covers 204 (rolling) and 291 (Phase 1)
+        n_rf_list = list(range(150, 231))  # covers 164 (Phase 1) and 226 (rolling)
         subsample_list = [0.8]
         colsample_list = [0.7]
-        min_leaf_list = [4, 5]
+        min_leaf_list = [5]  # fix; Optuna low-importance, rolling best used 5
+    elif phase == "phase2_fine":
+        # Phase 2.2 (fine): very narrow ranges around Phase 2.1 best; center from evidence
+        rolling_list = [[15, 30]]
+        epochs_list = list(range(21, 25))  # 21-24
+        max_depth_list = [5]
+        lr_list = [0.07, 0.075, 0.08, 0.085, 0.09]  # narrow around 0.07-0.086
+        n_xgb_list = list(range(200, 281))  # 200-280
+        n_rf_list = list(range(170, 231))  # 170-230
+        subsample_list = [0.8]
+        colsample_list = [0.7]
+        min_leaf_list = [5]
 
     listmle_target = getattr(args, "listmle_target", None)
 

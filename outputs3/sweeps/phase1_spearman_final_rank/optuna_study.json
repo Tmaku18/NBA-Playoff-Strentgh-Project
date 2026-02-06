@@ -1,19 +1,19 @@
 {
-  "best_value": 0.49855394883203563,
+  "best_value": 0.5065628476084539,
   "best_params": {
     "rolling_windows": [
       10,
       30
     ],
-    "model_a_epochs": 21,
-    "max_depth": 4,
-    "learning_rate": 0.095553006662627,
-    "n_estimators_xgb": 266,
-    "n_estimators_rf": 157,
+    "model_a_epochs": 19,
+    "max_depth": 3,
+    "learning_rate": 0.07867880272389376,
+    "n_estimators_xgb": 230,
+    "n_estimators_rf": 197,
     "subsample": 0.8,
     "colsample_bytree": 0.7,
-    "min_samples_leaf": 4
+    "min_samples_leaf": 5
   },
-  "n_trials": 12,
+  "n_trials": 20,
   "objective": "spearman"
 }
