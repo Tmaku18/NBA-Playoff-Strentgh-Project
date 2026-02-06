@@ -270,7 +270,7 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 â
 | min_samples_leaf | 0.008 |
 | subsample, rolling_windows, colsample_bytree | 0 |
 
-**Next:** Run phase1_spearman_playoff_outcome (same objective, listmle_target=playoff_outcome).
+**Next:** Run phase1_spearman_playoff_outcome (same objective, listmle_target=playoff_outcome). **Done.** See `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md` for full Phase 1 analysis.
 
 ---
 
@@ -293,7 +293,7 @@ West outperforms East on both metrics; West Spearman improved vs run_022 (0.50 â
 3. **Playoff-trained (sweep 2)** improved further over sweep 1: better Spearman, playoff_spearman, rank_mae, rank_rmse.
 4. **NDCG sweeps (3 and 4)** both reached NDCG 0.486; playoff target tied on NDCG, slightly worse playoff_spearman, better rank_mae.
 5. **Hypothesis supported:** Playoff-optimized training (sweep 2) gives best Spearman and playoff_spearman. NDCG-optimized configs are similar for standings vs playoff target.
-6. **Next:** Phase 1 â€” full sweeps with narrowed ranges (see phased_sweep_roadmap), starting with `spearman` objective. Consider adding NDCG@12, NDCG@16, NDCG@20 sweeps per hypotheses below.
+6. **Next:** Phase 1 spearman complete (outputs3). Rolling sweep and Phase 2 per `.cursor/plans/PHASE2_SWEEP_PLAN.md`. Consider adding NDCG@12, NDCG@16, NDCG@20 sweeps per hypotheses below.
 
 ---
 

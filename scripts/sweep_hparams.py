@@ -201,7 +201,7 @@ def _run_one_combo(
     combo_out = combo_dir / "outputs"
     combo_out.mkdir(parents=True, exist_ok=True)
     cfg = copy.deepcopy(config)
-    if phase in ("phase1", "phase1_xgb", "rolling"):
+    if phase in ("phase1", "phase1_xgb", "phase2", "rolling"):
         cfg.setdefault("inference", {})["run_id"] = "run_024"
         cfg.setdefault("inference", {})["run_id_base"] = 24
     cfg["training"] = cfg.get("training", {})
@@ -261,8 +261,8 @@ def main() -> int:
         "--phase",
         type=str,
         default="full",
-        choices=("full", "phase1", "phase1_xgb", "phase2_rf", "baseline", "rolling"),
-        help="full=config grid; phase1=narrowed Optuna ranges; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges; rolling=test rolling_windows last (after main sweeps)",
+        choices=("full", "phase1", "phase1_xgb", "phase2", "phase2_rf", "baseline", "rolling"),
+        help="full=config grid; phase1=narrowed Optuna ranges; phase2=narrowed post-Phase1; phase1_xgb/phase2_rf=phased Model B; baseline=wide ranges; rolling=test rolling_windows",
     )
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
     parser.add_argument(
@@ -374,6 +374,17 @@ def main() -> int:
         subsample_list = [0.8]
         colsample_list = [0.7]
         min_leaf_list = [4, 5, 6]
+    elif phase == "phase2":
+        # Phase 2 (narrowed): from Phase 1 optuna_importances; fix low-importance params
+        rolling_list = [[10, 30]]  # or use best from rolling sweep
+        epochs_list = list(range(18, 25))  # 18-24, center 21
+        max_depth_list = [4, 5]
+        lr_list = [0.06, 0.07, 0.08]
+        n_xgb_list = list(range(270, 311))  # 270-310
+        n_rf_list = list(range(150, 181))  # 150-180
+        subsample_list = [0.8]
+        colsample_list = [0.7]
+        min_leaf_list = [4, 5]
 
     listmle_target = getattr(args, "listmle_target", None)
 

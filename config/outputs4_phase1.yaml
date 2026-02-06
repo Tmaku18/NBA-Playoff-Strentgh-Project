@@ -1,0 +1,27 @@
+# Outputs4 Phase I: new output root, run_id starting at 25
+# Use with: --config config/outputs4_phase1.yaml
+# Extends defaults.yaml; includes baseline_max_features training/sweep overrides.
+
+paths:
+  outputs: "outputs4"
+
+inference:
+  run_id: null
+  run_id_base: 25
+
+training:
+  max_lists_oof: 100
+  max_final_batches: 100
+
+sweep:
+  model_a_epochs: [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]
+  rolling_windows: [[10, 30]]
+  model_b:
+    max_depth: [3, 4, 5, 6]
+    learning_rate: [0.05, 0.08, 0.10, 0.12]
+    n_estimators_xgb: [200, 250, 300, 350]
+    n_estimators_rf: [150, 200, 250]
+    subsample: [0.8]
+    colsample_bytree: [0.7]
+    min_samples_leaf: [4, 5, 6]
+  include_clone_classifier: false

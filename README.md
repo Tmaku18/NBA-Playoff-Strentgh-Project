@@ -65,7 +65,7 @@ Used for training (optional) and evaluation when playoff data exists. **Phase 1:
 - Delta (actual conference rank − predicted league rank) and ensemble agreement (Model A / XGB / RF ranks).
 - Roster dependence (attention weights; IG contributors when enabled via `output.ig_inference_top_k` and Captum). `contributors_are_fallback` indicates when attention weights were not usable.
 - **Plots:** `pred_vs_actual.png` — two panels (East/West), Predicted Conference Rank vs Actual Conference Rank (1–15); `pred_vs_playoff_final_results.png` — predicted strength (global rank) vs playoff_final_results (1–30); `title_contender_scatter.png` — championship odds vs regular-season wins; `odds_top10.png` — top-10 championship odds bar chart.
-- **Report assets:** `outputs2/ANALYSIS.md` (run_020/021 analysis); **outputs3/** baseline and early Phase I sweeps; **outputs4/** Phase I sweeps (run_025+).
+- **Report assets:** `outputs2/ANALYSIS.md` (run_020/021 analysis); **outputs3/** baseline and Phase I spearman sweeps; **outputs4/** Phase I sweeps (run_025+); `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md` for Phase 1 analysis.
 
 ---
 

@@ -49,6 +49,14 @@ Standings-trained baseline sweep **outperformed** run_022 (playoff_outcome) on S
 
 **Phase 0 summary:** Playoff-optimized spearman (sweep 2) leads on Spearman (0.512) and playoff_spearman (0.513). NDCG sweeps both reached 0.486. Full comparison: `outputs3/sweeps/BASELINE_SWEEP_ANALYSIS.md`.
 
+### Phase 1 spearman results (outputs3)
+
+**phase1_spearman_final_rank** (listmle_target=standings): Best combo 10 — epochs 21, max_depth 5, lr 0.0704, n_xgb 291, n_rf 164, min_leaf 4. **Spearman 0.499**, **playoff_spearman 0.518**, rank_mae 6.73, rank_rmse 8.67, NDCG 0.485.
+
+**phase1_spearman_playoff_outcome** (listmle_target=playoff): Best combo 3 — epochs 21, max_depth 4, lr 0.0669, n_xgb 280, n_rf 151, min_leaf 5. Spearman 0.482, playoff_spearman 0.487, rank_mae 6.87, rank_rmse 8.81.
+
+**Phase 1 finding:** final_rank (standings) target **outperformed** playoff_outcome on spearman, playoff_spearman, rank_mae, rank_rmse — opposite of Phase 0. Full analysis: `outputs4/sweeps/SWEEP_PHASE1_ANALYSIS.md`.
+
 ### Hypothesized (pre-sweep expectations)
 
 | Objective              | Best model (expected) | Rationale                                                                 |

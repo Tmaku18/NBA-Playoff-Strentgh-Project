@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,16 @@ import torch
 import torch.nn as nn
 
 from src.models.deep_set_rank import DeepSetRank
+
+
+def _configure_torch_performance() -> None:
+    """Enable cuDNN benchmark and TF32 for faster training on supported hardware."""
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.benchmark = True
+    if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
+        torch.backends.cuda.matmul.allow_tf32 = True
+    if hasattr(torch, "set_float32_matmul_precision"):
+        torch.set_float32_matmul_precision("medium")
 from src.models.listmle_loss import listmle_loss
 from src.utils.repro import set_seeds
 
@@ -378,7 +389,10 @@ def train_model_a_on_batches(
     if not batches:
         model = _build_model(config, device)
         return model
+    _configure_torch_performance()
     model = _build_model(config, device, stat_dim_override=stat_dim_override)
+    if hasattr(torch, "compile") and sys.platform != "win32":
+        model = torch.compile(model, mode="reduce-overhead")
     lr = float(ma.get("learning_rate", 1e-3))
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
@@ -454,7 +468,10 @@ def train_model_a(
     stat_dim = int(ma.get("stat_dim", 14))
     num_emb = ma.get("num_embeddings", 500)
     stat_dim_override = int(batches[0]["player_stats"].shape[-1]) if batches else None
+    _configure_torch_performance()
     model = _build_model(config, device, stat_dim_override=stat_dim_override)
+    if hasattr(torch, "compile") and sys.platform != "win32":
+        model = torch.compile(model, mode="reduce-overhead")
     lr = float(ma.get("learning_rate", 1e-3))
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
