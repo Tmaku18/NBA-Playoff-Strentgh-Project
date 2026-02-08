@@ -269,6 +269,12 @@ def main() -> int:
     )
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (default: config/defaults.yaml)")
     parser.add_argument(
+        "--phase2-best-config",
+        type=str,
+        default=None,
+        help="For phase2_fine: path to prior sweep's sweep_results_summary.json or batch dir. Ranges center on best params.",
+    )
+    parser.add_argument(
         "--listmle-target",
         type=str,
         default=None,
@@ -390,16 +396,44 @@ def main() -> int:
         colsample_list = [0.7]
         min_leaf_list = [5]  # fix; Optuna low-importance, rolling best used 5
     elif phase == "phase2_fine":
-        # Phase 2.2 (fine): very narrow ranges around Phase 2.1 best; center from evidence
+        # Phase 2.2 (fine): narrow ranges around Phase 2 coarse best. Center from --phase2-best-config or defaults.
         rolling_list = [[15, 30]]
-        epochs_list = list(range(21, 25))  # 21-24
         max_depth_list = [5]
-        lr_list = [0.07, 0.075, 0.08, 0.085, 0.09]  # narrow around 0.07-0.086
-        n_xgb_list = list(range(200, 281))  # 200-280
-        n_rf_list = list(range(170, 231))  # 170-230
         subsample_list = [0.8]
         colsample_list = [0.7]
         min_leaf_list = [5]
+        loaded = False
+        best_cfg_path = getattr(args, "phase2_best_config", None)
+        if best_cfg_path:
+            p = Path(best_cfg_path)
+            if not p.is_absolute():
+                p = ROOT / p
+            if p.is_dir():
+                p = p / "sweep_results_summary.json"
+            if p.exists():
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        sm = json.load(f)
+                    best = sm.get("best_by_spearman") or sm.get("best_optuna_trial") or {}
+                    ep = int(best.get("model_a_epochs", 20))
+                    lr = float(best.get("learning_rate", 0.08))
+                    nx = int(best.get("n_estimators_xgb", 204))
+                    nr = int(best.get("n_estimators_rf", 209))
+                    epochs_list = list(range(max(16, ep - 2), min(28, ep + 3)))
+                    lr_min, lr_max = max(0.05, lr - 0.015), min(0.12, lr + 0.015)
+                    lr_list = [lr_min, lr_max]
+                    n_xgb_list = list(range(max(150, nx - 25), min(351, nx + 25)))
+                    n_rf_list = list(range(max(130, nr - 25), min(261, nr + 25)))
+                    print(f"[phase2_fine] Centered on prior best: epochs={ep} lr={lr:.4f} n_xgb={nx} n_rf={nr}", flush=True)
+                    loaded = True
+                except Exception as e:
+                    print(f"[phase2_fine] Could not load --phase2-best-config: {e}. Using defaults.", flush=True)
+        if not loaded:
+            # Default: center on Phase 2 coarse best (combo 8): epochs 20, lr 0.08, n_xgb 204, n_rf 209
+            epochs_list = list(range(18, 23))  # 18-22, center 20
+            lr_list = [0.075, 0.078, 0.08, 0.082, 0.085]
+            n_xgb_list = list(range(190, 221))  # 190-220, center 204
+            n_rf_list = list(range(195, 226))  # 195-225, center 209
 
     listmle_target = getattr(args, "listmle_target", None)
 

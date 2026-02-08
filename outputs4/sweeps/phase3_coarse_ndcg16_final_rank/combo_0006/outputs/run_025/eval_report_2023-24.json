@@ -1,0 +1,77 @@
+{
+  "test_metrics_ensemble": {
+    "ndcg": 0.5489227567395806,
+    "spearman": 0.41490545050055616,
+    "mrr_top2": 1.0,
+    "mrr_top4": 1.0,
+    "ndcg10": 0.5489227567395806,
+    "ndcg_at_4": 0.35315119534797357,
+    "ndcg_at_12": 0.594079713814139,
+    "ndcg_at_16": 0.5953719517440849,
+    "ndcg_at_20": 0.5959868993554067,
+    "roc_auc_upset": 0.8080357142857143,
+    "rank_mae_pred_vs_playoff_final_results": 7.333333492279053,
+    "rank_rmse_pred_vs_playoff_final_results": 9.36304759979248,
+    "rank_mae_eos_standings_vs_playoff_final_results": 3.7333333333333334,
+    "rank_rmse_eos_standings_vs_playoff_final_results": 6.093712606722878,
+    "playoff_metrics": {
+      "spearman_pred_vs_playoff_final_results": 0.47230255839822033,
+      "ndcg_at_4_final_four": 0.35315119534797357,
+      "ndcg10_pred_vs_playoff_final_results": 0.5489277688081619,
+      "brier_championship_odds": 0.03222232684493065,
+      "rank_mae_pred_vs_playoff_final_results": 7.333333492279053,
+      "rank_rmse_pred_vs_playoff_final_results": 9.36304759979248,
+      "rank_mae_eos_standings_vs_playoff_final_results": 3.7333333333333334,
+      "rank_rmse_eos_standings_vs_playoff_final_results": 6.093712606722878
+    }
+  },
+  "test_metrics_model_a": {
+    "ndcg": 0.5411482319759596,
+    "spearman": 0.39443826473859844,
+    "mrr_top2": 1.0,
+    "mrr_top4": 1.0,
+    "ndcg10": 0.5411482319759596,
+    "ndcg_at_4": 0.35315119534797357,
+    "ndcg_at_12": 0.5863072311629915,
+    "ndcg_at_16": 0.5875661090077112,
+    "ndcg_at_20": 0.5881810909508569,
+    "roc_auc_upset": 0.8169642857142857
+  },
+  "test_metrics_model_b": {
+    "ndcg": 0.5696604880023005,
+    "spearman": 0.439377085650723,
+    "mrr_top2": 0.5,
+    "mrr_top4": 0.5,
+    "ndcg10": 0.5696604880023005,
+    "ndcg_at_4": 0.44093212795935904,
+    "ndcg_at_12": 0.5695356542004015,
+    "ndcg_at_16": 0.5746483505654559,
+    "ndcg_at_20": 0.5746510107244691,
+    "roc_auc_upset": 0.7601809954751131
+  },
+  "test_metrics_model_c": {
+    "ndcg": 0.3335103168238178,
+    "spearman": 0.23737486095661847,
+    "mrr_top2": 0.16666666666666666,
+    "mrr_top4": 0.16666666666666666,
+    "ndcg10": 0.3335103168238178,
+    "ndcg_at_4": 0.001111095381373398,
+    "ndcg_at_12": 0.33890852755612016,
+    "ndcg_at_16": 0.3596651465096424,
+    "ndcg_at_20": 0.37000114042130106,
+    "roc_auc_upset": 0.7633928571428571
+  },
+  "test_metrics_by_conference": {
+    "E": {
+      "ndcg": 0.3851402749883562,
+      "spearman": 0.2642857142857143
+    },
+    "W": {
+      "ndcg": 0.9193500683938988,
+      "spearman": 0.5285714285714286
+    }
+  },
+  "notes": {
+    "eos_rank_source": "eos_final_rank"
+  }
+}

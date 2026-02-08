@@ -44,7 +44,7 @@ model_a:
   dropout: 0.2
   learning_rate: 0.0001
   grad_clip_max_norm: 5.0  # looser than 1.0 to avoid zero effective gradients when norm is large
-  epochs: 28
+  epochs: 22  # Phase 3 fine NDCG@16 combo 18 (Spearman 0.557, playoff_spearman 0.568, NDCG@16 0.550)
   early_stopping_patience: 0
   early_stopping_min_delta: 0.0
   early_stopping_val_frac: 0.25
@@ -58,21 +58,23 @@ model_a:
 
 model_b:
   xgb:
-    n_estimators: 250
-    max_depth: 4
-    learning_rate: 0.08
+    n_estimators: 229  # Phase 3 fine NDCG@16 combo 18
+    max_depth: 5
+    learning_rate: 0.072
     early_stopping_rounds: 20
+    subsample: 0.8
+    colsample_bytree: 0.7
   rf:
-    n_estimators: 200
+    n_estimators: 173  # Phase 3 fine NDCG@16 combo 18
     max_depth: 12
     min_samples_leaf: 5
 
 training:
   n_folds: 5
-  rolling_windows: [10, 30]
+  rolling_windows: [15, 30]  # Phase 3 fine NDCG@16 combo 18
   roster_size: 15
   target_rank: "playoffs"  # or "standings" to train meta on standings-to-date
-  listmle_target: "playoff_outcome"  # "playoff_outcome"=EOS playoff result (champion=1); "final_rank"=EOS standings; "standings"=win-rate to date
+  listmle_target: "final_rank"  # Phase 3 best: "final_rank"=EOS standings; "playoff_outcome"=EOS playoff result (champion=1)
   # 75/25 train-test split (script 3 writes split_info.json; 4 and 6 read it)
   train_seasons: ["2015-16", "2016-17", "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23"]
   test_seasons: ["2023-24", "2024-25"]
@@ -80,9 +82,9 @@ training:
   holdout_seasons: ["2024-25"]
   train_test_cutoff: null   # optional date cutoff alternative, e.g. "2023-04-15"
   train_frac: 0.75          # fallback if seasons/cutoff not provided
-  # Model A (script 3): subsample lists for feasible runtime
-  max_lists_oof: 30        # max lists for OOF; subsampled when there are more
-  max_final_batches: 50    # max lists for final Model A training (script 3)
+  # Model A (script 3): subsample lists for feasible runtime (Phase 3 combo 18 used 100/100)
+  max_lists_oof: 100       # max lists for OOF; subsampled when there are more
+  max_final_batches: 100   # max lists for final Model A training (script 3)
   # build_lists (src/training/build_lists.py) subsamples dates to 200 when there are more
   # If true, use per-season walk-forward instead of pooled OOF (Model A only)
   walk_forward: false

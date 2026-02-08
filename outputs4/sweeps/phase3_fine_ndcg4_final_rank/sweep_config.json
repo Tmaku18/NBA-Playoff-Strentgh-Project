@@ -1,0 +1,9 @@
+{
+  "batch_id": "phase3_fine_ndcg4_final_rank",
+  "method": "optuna",
+  "n_combos": 20,
+  "n_jobs": 4,
+  "config_outputs": "/mnt/c/Users/tmaku/OneDrive/Documents/GSU/Advanced Machine Learning/NBA Playoff Strentgh Project/outputs4",
+  "val_frac": 0.25,
+  "phase": "phase2_fine"
+}

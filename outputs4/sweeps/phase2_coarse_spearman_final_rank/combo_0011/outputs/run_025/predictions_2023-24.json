@@ -1,0 +1,2239 @@
+{
+  "teams": [
+    {
+      "team_id": 1610612738,
+      "team_name": "Boston Celtics",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 8,
+        "ensemble_score": 0.7586206896551724,
+        "ensemble_score_100": 75.9,
+        "conference_rank": 5,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 1,
+        "EOS_global_rank": 1,
+        "EOS_playoff_standings": 1,
+        "classification": "Under-ranked by 7 slots",
+        "post_playoff_rank": 1,
+        "rank_delta_playoffs": -7
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 8,
+        "xgboost_rank": 1,
+        "random_forest_rank": 7,
+        "model_b_rank": 1,
+        "model_c_rank": 7
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Jayson Tatum",
+            "attention_weight": 0.7422196269035339
+          },
+          {
+            "player": "Derrick White",
+            "attention_weight": 0.0374733991920948
+          },
+          {
+            "player": "Jaylen Brown",
+            "attention_weight": 0.03678717464208603
+          },
+          {
+            "player": "Jrue Holiday",
+            "attention_weight": 0.03573806583881378
+          },
+          {
+            "player": "Al Horford",
+            "attention_weight": 0.027912689372897148
+          },
+          {
+            "player": "Payton Pritchard",
+            "attention_weight": 0.027454299852252007
+          },
+          {
+            "player": "Kristaps Porzi\u0146\u0123is",
+            "attention_weight": 0.026799455285072327
+          },
+          {
+            "player": "Sam Hauser",
+            "attention_weight": 0.02621009573340416
+          },
+          {
+            "player": "Luke Kornet",
+            "attention_weight": 0.014537516050040722
+          },
+          {
+            "player": "Oshae Brissett",
+            "attention_weight": 0.00954433809965849
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612749,
+      "team_name": "Milwaukee Bucks",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 4,
+        "ensemble_score": 0.896551724137931,
+        "ensemble_score_100": 89.7,
+        "conference_rank": 2,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 2,
+        "EOS_global_rank": 11,
+        "EOS_playoff_standings": 9,
+        "classification": "Over-ranked by 7 slots",
+        "post_playoff_rank": 11,
+        "rank_delta_playoffs": 7
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Medium",
+        "deep_set_rank": 4,
+        "xgboost_rank": 6,
+        "random_forest_rank": 2,
+        "model_b_rank": 6,
+        "model_c_rank": 2
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Giannis Antetokounmpo",
+            "attention_weight": 0.7421916723251343
+          },
+          {
+            "player": "Damian Lillard",
+            "attention_weight": 0.041104208678007126
+          },
+          {
+            "player": "Brook Lopez",
+            "attention_weight": 0.03828747943043709
+          },
+          {
+            "player": "Malik Beasley",
+            "attention_weight": 0.03731049969792366
+          },
+          {
+            "player": "Bobby Portis",
+            "attention_weight": 0.031650759279727936
+          },
+          {
+            "player": "Pat Connaughton",
+            "attention_weight": 0.026378443464636803
+          },
+          {
+            "player": "Khris Middleton",
+            "attention_weight": 0.023363281041383743
+          },
+          {
+            "player": "Jae Crowder",
+            "attention_weight": 0.017905673012137413
+          },
+          {
+            "player": "MarJon Beauchamp",
+            "attention_weight": 0.009971926920115948
+          },
+          {
+            "player": "AJ Green",
+            "attention_weight": 0.00953397061675787
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612761,
+      "team_name": "Toronto Raptors",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 26,
+        "ensemble_score": 0.13793103448275862,
+        "ensemble_score_100": 13.8,
+        "conference_rank": 12,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 3,
+        "EOS_global_rank": 23,
+        "EOS_playoff_standings": 25,
+        "classification": "Under-ranked by 3 slots",
+        "post_playoff_rank": 25,
+        "rank_delta_playoffs": -1
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 26,
+        "xgboost_rank": 24,
+        "random_forest_rank": 10,
+        "model_b_rank": 24,
+        "model_c_rank": 10
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Scottie Barnes",
+            "attention_weight": 0.741327166557312
+          },
+          {
+            "player": "Gary Trent Jr.",
+            "attention_weight": 0.04321974888443947
+          },
+          {
+            "player": "Jakob Poeltl",
+            "attention_weight": 0.030459195375442505
+          },
+          {
+            "player": "RJ Barrett",
+            "attention_weight": 0.028174813836812973
+          },
+          {
+            "player": "Immanuel Quickley",
+            "attention_weight": 0.02815205231308937
+          },
+          {
+            "player": "Gradey Dick",
+            "attention_weight": 0.026582570746541023
+          },
+          {
+            "player": "Bruce Brown",
+            "attention_weight": 0.0184139683842659
+          },
+          {
+            "player": "Chris Boucher",
+            "attention_weight": 0.01626797951757908
+          },
+          {
+            "player": "Kelly Olynyk",
+            "attention_weight": 0.014375817961990833
+          },
+          {
+            "player": "Ochai Agbaji",
+            "attention_weight": 0.011329898610711098
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612748,
+      "team_name": "Miami Heat",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 29,
+        "ensemble_score": 0.034482758620689655,
+        "ensemble_score_100": 3.4,
+        "conference_rank": 14,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 4,
+        "EOS_global_rank": 14,
+        "EOS_playoff_standings": 17,
+        "classification": "Under-ranked by 15 slots",
+        "post_playoff_rank": 14,
+        "rank_delta_playoffs": -15
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 29,
+        "xgboost_rank": 11,
+        "random_forest_rank": 11,
+        "model_b_rank": 11,
+        "model_c_rank": 11
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Jimmy Butler III",
+            "attention_weight": 0.5481728315353394
+          },
+          {
+            "player": "Bam Adebayo",
+            "attention_weight": 0.16845276951789856
+          },
+          {
+            "player": "Tyler Herro",
+            "attention_weight": 0.07810802757740021
+          },
+          {
+            "player": "Jaime Jaquez Jr.",
+            "attention_weight": 0.03524421155452728
+          },
+          {
+            "player": "Duncan Robinson",
+            "attention_weight": 0.03344134986400604
+          },
+          {
+            "player": "Caleb Martin",
+            "attention_weight": 0.028333237394690514
+          },
+          {
+            "player": "Haywood Highsmith",
+            "attention_weight": 0.021846463903784752
+          },
+          {
+            "player": "Josh Richardson",
+            "attention_weight": 0.019513346254825592
+          },
+          {
+            "player": "Terry Rozier",
+            "attention_weight": 0.01688479818403721
+          },
+          {
+            "player": "Kevin Love",
+            "attention_weight": 0.015448066405951977
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612739,
+      "team_name": "Cleveland Cavaliers",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 13,
+        "ensemble_score": 0.5862068965517241,
+        "ensemble_score_100": 58.6,
+        "conference_rank": 6,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 5,
+        "EOS_global_rank": 8,
+        "EOS_playoff_standings": 11,
+        "classification": "Under-ranked by 5 slots",
+        "post_playoff_rank": 8,
+        "rank_delta_playoffs": -5
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 13,
+        "xgboost_rank": 8,
+        "random_forest_rank": 20,
+        "model_b_rank": 8,
+        "model_c_rank": 20
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Donovan Mitchell",
+            "attention_weight": 0.729676365852356
+          },
+          {
+            "player": "Jarrett Allen",
+            "attention_weight": 0.03684467077255249
+          },
+          {
+            "player": "Max Strus",
+            "attention_weight": 0.03370550647377968
+          },
+          {
+            "player": "Caris LeVert",
+            "attention_weight": 0.02972492389380932
+          },
+          {
+            "player": "Isaac Okoro",
+            "attention_weight": 0.028883496299386024
+          },
+          {
+            "player": "Darius Garland",
+            "attention_weight": 0.02855987288057804
+          },
+          {
+            "player": "Georges Niang",
+            "attention_weight": 0.027928804978728294
+          },
+          {
+            "player": "Evan Mobley",
+            "attention_weight": 0.022427186369895935
+          },
+          {
+            "player": "Dean Wade",
+            "attention_weight": 0.018009711056947708
+          },
+          {
+            "player": "Sam Merrill",
+            "attention_weight": 0.01702265627682209
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612754,
+      "team_name": "Indiana Pacers",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 30,
+        "ensemble_score": 0.0,
+        "ensemble_score_100": 0.0,
+        "conference_rank": 15,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 6,
+        "EOS_global_rank": 4,
+        "EOS_playoff_standings": 14,
+        "classification": "Under-ranked by 26 slots",
+        "post_playoff_rank": 4,
+        "rank_delta_playoffs": -26
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 30,
+        "xgboost_rank": 5,
+        "random_forest_rank": 14,
+        "model_b_rank": 5,
+        "model_c_rank": 14
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Pascal Siakam",
+            "attention_weight": 0.6560378074645996
+          },
+          {
+            "player": "Tyrese Haliburton",
+            "attention_weight": 0.10493241995573044
+          },
+          {
+            "player": "Myles Turner",
+            "attention_weight": 0.03651629388332367
+          },
+          {
+            "player": "Aaron Nesmith",
+            "attention_weight": 0.03471871092915535
+          },
+          {
+            "player": "Obi Toppin",
+            "attention_weight": 0.030828138813376427
+          },
+          {
+            "player": "Andrew Nembhard",
+            "attention_weight": 0.02934601716697216
+          },
+          {
+            "player": "Bennedict Mathurin",
+            "attention_weight": 0.028475303202867508
+          },
+          {
+            "player": "T.J. McConnell",
+            "attention_weight": 0.022454146295785904
+          },
+          {
+            "player": "Jalen Smith",
+            "attention_weight": 0.01835978589951992
+          },
+          {
+            "player": "Isaiah Jackson",
+            "attention_weight": 0.013913420028984547
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612755,
+      "team_name": "Philadelphia 76ers",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 2,
+        "ensemble_score": 0.9655172413793104,
+        "ensemble_score_100": 96.6,
+        "conference_rank": 1,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 7,
+        "EOS_global_rank": 12,
+        "EOS_playoff_standings": 15,
+        "classification": "Over-ranked by 10 slots",
+        "post_playoff_rank": 12,
+        "rank_delta_playoffs": 10
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 2,
+        "xgboost_rank": 15,
+        "random_forest_rank": 9,
+        "model_b_rank": 15,
+        "model_c_rank": 9
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Joel Embiid",
+            "attention_weight": 0.722732663154602
+          },
+          {
+            "player": "Tyrese Maxey",
+            "attention_weight": 0.04617394506931305
+          },
+          {
+            "player": "Tobias Harris",
+            "attention_weight": 0.04242556542158127
+          },
+          {
+            "player": "Kelly Oubre Jr.",
+            "attention_weight": 0.03545099124312401
+          },
+          {
+            "player": "Paul Reed",
+            "attention_weight": 0.02763722464442253
+          },
+          {
+            "player": "Nicolas Batum",
+            "attention_weight": 0.024765342473983765
+          },
+          {
+            "player": "De'Anthony Melton",
+            "attention_weight": 0.018667249009013176
+          },
+          {
+            "player": "Buddy Hield",
+            "attention_weight": 0.013408343307673931
+          },
+          {
+            "player": "Mo Bamba",
+            "attention_weight": 0.013091317377984524
+          },
+          {
+            "player": "KJ Martin",
+            "attention_weight": 0.01247591432183981
+          }
+        ],
+        "contributors_are_fallback": false,
+        "ig_contributors": [
+          {
+            "player": "Joel Embiid",
+            "attribution_norm": 94.09322357177734
+          },
+          {
+            "player": "Tyrese Maxey",
+            "attribution_norm": 4.768224239349365
+          },
+          {
+            "player": "Tobias Harris",
+            "attribution_norm": 0.8669273853302002
+          },
+          {
+            "player": "Buddy Hield",
+            "attribution_norm": 0.7264573574066162
+          },
+          {
+            "player": "De'Anthony Melton",
+            "attribution_norm": 0.6567843556404114
+          }
+        ]
+      }
+    },
+    {
+      "team_id": 1610612737,
+      "team_name": "Atlanta Hawks",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 5,
+        "ensemble_score": 0.8620689655172413,
+        "ensemble_score_100": 86.2,
+        "conference_rank": 3,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 8,
+        "EOS_global_rank": 19,
+        "EOS_playoff_standings": 21,
+        "classification": "Over-ranked by 14 slots",
+        "post_playoff_rank": 21,
+        "rank_delta_playoffs": 16
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 5,
+        "xgboost_rank": 13,
+        "random_forest_rank": 13,
+        "model_b_rank": 13,
+        "model_c_rank": 13
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Trae Young",
+            "attention_weight": 0.729488730430603
+          },
+          {
+            "player": "Dejounte Murray",
+            "attention_weight": 0.04420330375432968
+          },
+          {
+            "player": "Bogdan Bogdanovi\u0107",
+            "attention_weight": 0.03687059506773949
+          },
+          {
+            "player": "Saddiq Bey",
+            "attention_weight": 0.033787112683057785
+          },
+          {
+            "player": "Jalen Johnson",
+            "attention_weight": 0.03003116510808468
+          },
+          {
+            "player": "Clint Capela",
+            "attention_weight": 0.028997870162129402
+          },
+          {
+            "player": "De'Andre Hunter",
+            "attention_weight": 0.02548794634640217
+          },
+          {
+            "player": "Onyeka Okongwu",
+            "attention_weight": 0.023044120520353317
+          },
+          {
+            "player": "Garrison Mathews",
+            "attention_weight": 0.014351322315633297
+          },
+          {
+            "player": "Bruno Fernando",
+            "attention_weight": 0.009447270072996616
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612741,
+      "team_name": "Chicago Bulls",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 14,
+        "ensemble_score": 0.5517241379310345,
+        "ensemble_score_100": 55.2,
+        "conference_rank": 7,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 9,
+        "EOS_global_rank": 18,
+        "EOS_playoff_standings": 20,
+        "classification": "Over-ranked by 4 slots",
+        "post_playoff_rank": 20,
+        "rank_delta_playoffs": 6
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 14,
+        "xgboost_rank": 22,
+        "random_forest_rank": 23,
+        "model_b_rank": 22,
+        "model_c_rank": 23
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "DeMar DeRozan",
+            "attention_weight": 0.744337260723114
+          },
+          {
+            "player": "Coby White",
+            "attention_weight": 0.04411493241786957
+          },
+          {
+            "player": "Nikola Vu\u010devi\u0107",
+            "attention_weight": 0.039450161159038544
+          },
+          {
+            "player": "Ayo Dosunmu",
+            "attention_weight": 0.034886330366134644
+          },
+          {
+            "player": "Alex Caruso",
+            "attention_weight": 0.03086775355041027
+          },
+          {
+            "player": "Andre Drummond",
+            "attention_weight": 0.021117515861988068
+          },
+          {
+            "player": "Patrick Williams",
+            "attention_weight": 0.018796030431985855
+          },
+          {
+            "player": "Torrey Craig",
+            "attention_weight": 0.015321805141866207
+          },
+          {
+            "player": "Jevon Carter",
+            "attention_weight": 0.014761446975171566
+          },
+          {
+            "player": "Zach LaVine",
+            "attention_weight": 0.013964392244815826
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612764,
+      "team_name": "Washington Wizards",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 18,
+        "ensemble_score": 0.41379310344827586,
+        "ensemble_score_100": 41.4,
+        "conference_rank": 10,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 10,
+        "EOS_global_rank": 27,
+        "EOS_playoff_standings": 29,
+        "classification": "Over-ranked by 9 slots",
+        "post_playoff_rank": 29,
+        "rank_delta_playoffs": 11
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Medium",
+        "deep_set_rank": 18,
+        "xgboost_rank": 20,
+        "random_forest_rank": 15,
+        "model_b_rank": 20,
+        "model_c_rank": 15
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Kyle Kuzma",
+            "attention_weight": 0.7424564957618713
+          },
+          {
+            "player": "Jordan Poole",
+            "attention_weight": 0.04232814535498619
+          },
+          {
+            "player": "Deni Avdija",
+            "attention_weight": 0.03936806321144104
+          },
+          {
+            "player": "Tyus Jones",
+            "attention_weight": 0.03599627688527107
+          },
+          {
+            "player": "Corey Kispert",
+            "attention_weight": 0.03573556989431381
+          },
+          {
+            "player": "Bilal Coulibaly",
+            "attention_weight": 0.031973931938409805
+          },
+          {
+            "player": "Landry Shamet",
+            "attention_weight": 0.013538175262510777
+          },
+          {
+            "player": "Marvin Bagley III",
+            "attention_weight": 0.010707635432481766
+          },
+          {
+            "player": "Johnny Davis",
+            "attention_weight": 0.010000000707805157
+          },
+          {
+            "player": "Jared Butler",
+            "attention_weight": 0.008659218437969685
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612751,
+      "team_name": "Brooklyn Nets",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 24,
+        "ensemble_score": 0.20689655172413793,
+        "ensemble_score_100": 20.7,
+        "conference_rank": 11,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 11,
+        "EOS_global_rank": 20,
+        "EOS_playoff_standings": 22,
+        "classification": "Under-ranked by 4 slots",
+        "post_playoff_rank": 22,
+        "rank_delta_playoffs": -2
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Medium",
+        "deep_set_rank": 24,
+        "xgboost_rank": 23,
+        "random_forest_rank": 19,
+        "model_b_rank": 23,
+        "model_c_rank": 19
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Cam Thomas",
+            "attention_weight": 0.7358825206756592
+          },
+          {
+            "player": "Mikal Bridges",
+            "attention_weight": 0.05214107409119606
+          },
+          {
+            "player": "Nic Claxton",
+            "attention_weight": 0.03800457343459129
+          },
+          {
+            "player": "Dorian Finney-Smith",
+            "attention_weight": 0.03634805977344513
+          },
+          {
+            "player": "Cameron Johnson",
+            "attention_weight": 0.029950497671961784
+          },
+          {
+            "player": "Dennis Smith Jr.",
+            "attention_weight": 0.020163748413324356
+          },
+          {
+            "player": "Lonnie Walker IV",
+            "attention_weight": 0.017460016533732414
+          },
+          {
+            "player": "Day'Ron Sharpe",
+            "attention_weight": 0.016698401421308517
+          },
+          {
+            "player": "Dennis Schr\u00f6der",
+            "attention_weight": 0.015727344900369644
+          },
+          {
+            "player": "Trendon Watford",
+            "attention_weight": 0.013613861985504627
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612766,
+      "team_name": "Charlotte Hornets",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 15,
+        "ensemble_score": 0.5172413793103449,
+        "ensemble_score_100": 51.7,
+        "conference_rank": 8,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 12,
+        "EOS_global_rank": 26,
+        "EOS_playoff_standings": 28,
+        "classification": "Over-ranked by 11 slots",
+        "post_playoff_rank": 28,
+        "rank_delta_playoffs": 13
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 15,
+        "xgboost_rank": 29,
+        "random_forest_rank": 28,
+        "model_b_rank": 29,
+        "model_c_rank": 28
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "LaMelo Ball",
+            "attention_weight": 0.5417460203170776
+          },
+          {
+            "player": "Miles Bridges",
+            "attention_weight": 0.22472302615642548
+          },
+          {
+            "player": "Brandon Miller",
+            "attention_weight": 0.047388315200805664
+          },
+          {
+            "player": "Nick Richards",
+            "attention_weight": 0.035609178245067596
+          },
+          {
+            "player": "Bryce McGowens",
+            "attention_weight": 0.017156008630990982
+          },
+          {
+            "player": "Grant Williams",
+            "attention_weight": 0.016507428139448166
+          },
+          {
+            "player": "Cody Martin",
+            "attention_weight": 0.015775160863995552
+          },
+          {
+            "player": "Ish Smith",
+            "attention_weight": 0.015482251532375813
+          },
+          {
+            "player": "Tre Mann",
+            "attention_weight": 0.014896436594426632
+          },
+          {
+            "player": "Vasilije Micic",
+            "attention_weight": 0.014854592271149158
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612752,
+      "team_name": "New York Knicks",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 7,
+        "ensemble_score": 0.7931034482758621,
+        "ensemble_score_100": 79.3,
+        "conference_rank": 4,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 13,
+        "EOS_global_rank": 6,
+        "EOS_playoff_standings": 7,
+        "classification": "Under-ranked by 1 slots",
+        "post_playoff_rank": 6,
+        "rank_delta_playoffs": -1
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 7,
+        "xgboost_rank": 16,
+        "random_forest_rank": 12,
+        "model_b_rank": 16,
+        "model_c_rank": 12
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Jalen Brunson",
+            "attention_weight": 0.6167433857917786
+          },
+          {
+            "player": "Julius Randle",
+            "attention_weight": 0.16260650753974915
+          },
+          {
+            "player": "Josh Hart",
+            "attention_weight": 0.04780429229140282
+          },
+          {
+            "player": "Donte DiVincenzo",
+            "attention_weight": 0.040931880474090576
+          },
+          {
+            "player": "Isaiah Hartenstein",
+            "attention_weight": 0.03381139785051346
+          },
+          {
+            "player": "Miles McBride",
+            "attention_weight": 0.02383551374077797
+          },
+          {
+            "player": "Precious Achiuwa",
+            "attention_weight": 0.021684225648641586
+          },
+          {
+            "player": "Mitchell Robinson",
+            "attention_weight": 0.012945805676281452
+          },
+          {
+            "player": "OG Anunoby",
+            "attention_weight": 0.0119367940351367
+          },
+          {
+            "player": "Jericho Sims",
+            "attention_weight": 0.010756440460681915
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612753,
+      "team_name": "Orlando Magic",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 16,
+        "ensemble_score": 0.4827586206896552,
+        "ensemble_score_100": 48.3,
+        "conference_rank": 9,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 14,
+        "EOS_global_rank": 9,
+        "EOS_playoff_standings": 13,
+        "classification": "Under-ranked by 7 slots",
+        "post_playoff_rank": 9,
+        "rank_delta_playoffs": -7
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 16,
+        "xgboost_rank": 25,
+        "random_forest_rank": 18,
+        "model_b_rank": 25,
+        "model_c_rank": 18
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Paolo Banchero",
+            "attention_weight": 0.7425591945648193
+          },
+          {
+            "player": "Franz Wagner",
+            "attention_weight": 0.03662186115980148
+          },
+          {
+            "player": "Jalen Suggs",
+            "attention_weight": 0.03058568388223648
+          },
+          {
+            "player": "Cole Anthony",
+            "attention_weight": 0.02812906913459301
+          },
+          {
+            "player": "Moritz Wagner",
+            "attention_weight": 0.02154013141989708
+          },
+          {
+            "player": "Wendell Carter Jr.",
+            "attention_weight": 0.021296095103025436
+          },
+          {
+            "player": "Gary Harris",
+            "attention_weight": 0.019099783152341843
+          },
+          {
+            "player": "Anthony Black",
+            "attention_weight": 0.01841648668050766
+          },
+          {
+            "player": "Joe Ingles",
+            "attention_weight": 0.017603036016225815
+          },
+          {
+            "player": "Goga Bitadze",
+            "attention_weight": 0.015178958885371685
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612765,
+      "team_name": "Detroit Pistons",
+      "conference": "E",
+      "prediction": {
+        "predicted_strength": 27,
+        "ensemble_score": 0.10344827586206896,
+        "ensemble_score_100": 10.3,
+        "conference_rank": 13,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 15,
+        "EOS_global_rank": 28,
+        "EOS_playoff_standings": 30,
+        "classification": "Over-ranked by 1 slots",
+        "post_playoff_rank": 30,
+        "rank_delta_playoffs": 3
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "High",
+        "deep_set_rank": 27,
+        "xgboost_rank": 30,
+        "random_forest_rank": 27,
+        "model_b_rank": 30,
+        "model_c_rank": 27
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Cade Cunningham",
+            "attention_weight": 0.7418569326400757
+          },
+          {
+            "player": "Jaden Ivey",
+            "attention_weight": 0.041782379150390625
+          },
+          {
+            "player": "Jalen Duren",
+            "attention_weight": 0.03461771830916405
+          },
+          {
+            "player": "Ausar Thompson",
+            "attention_weight": 0.03197498992085457
+          },
+          {
+            "player": "Isaiah Stewart",
+            "attention_weight": 0.028727056458592415
+          },
+          {
+            "player": "Marcus Sasser",
+            "attention_weight": 0.024087153375148773
+          },
+          {
+            "player": "Killian Hayes",
+            "attention_weight": 0.020334884524345398
+          },
+          {
+            "player": "James Wiseman",
+            "attention_weight": 0.01914464682340622
+          },
+          {
+            "player": "Kevin Knox II",
+            "attention_weight": 0.011317330412566662
+          },
+          {
+            "player": "Simone Fontecchio",
+            "attention_weight": 0.009743798524141312
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612744,
+      "team_name": "Golden State Warriors",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 19,
+        "ensemble_score": 0.3793103448275862,
+        "ensemble_score_100": 37.9,
+        "conference_rank": 9,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 1,
+        "EOS_global_rank": 15,
+        "EOS_playoff_standings": 16,
+        "classification": "Under-ranked by 4 slots",
+        "post_playoff_rank": 17,
+        "rank_delta_playoffs": -2
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 20,
+        "xgboost_rank": 2,
+        "random_forest_rank": 1,
+        "model_b_rank": 2,
+        "model_c_rank": 1
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Stephen Curry",
+            "attention_weight": 0.7374917268753052
+          },
+          {
+            "player": "Klay Thompson",
+            "attention_weight": 0.03497091308236122
+          },
+          {
+            "player": "Jonathan Kuminga",
+            "attention_weight": 0.0298321470618248
+          },
+          {
+            "player": "Brandin Podziemski",
+            "attention_weight": 0.02973497286438942
+          },
+          {
+            "player": "Andrew Wiggins",
+            "attention_weight": 0.02923400327563286
+          },
+          {
+            "player": "Draymond Green",
+            "attention_weight": 0.02267291769385338
+          },
+          {
+            "player": "Chris Paul",
+            "attention_weight": 0.02244667336344719
+          },
+          {
+            "player": "Kevon Looney",
+            "attention_weight": 0.01837427169084549
+          },
+          {
+            "player": "Dario \u0160ari\u0107",
+            "attention_weight": 0.01742081344127655
+          },
+          {
+            "player": "Moses Moody",
+            "attention_weight": 0.017388494685292244
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612746,
+      "team_name": "Los Angeles Clippers",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 22,
+        "ensemble_score": 0.27586206896551724,
+        "ensemble_score_100": 27.6,
+        "conference_rank": 12,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 2,
+        "EOS_global_rank": 10,
+        "EOS_playoff_standings": 5,
+        "classification": "Under-ranked by 12 slots",
+        "post_playoff_rank": 10,
+        "rank_delta_playoffs": -12
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 22,
+        "xgboost_rank": 4,
+        "random_forest_rank": 3,
+        "model_b_rank": 4,
+        "model_c_rank": 3
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Kawhi Leonard",
+            "attention_weight": 0.7181996703147888
+          },
+          {
+            "player": "James Harden",
+            "attention_weight": 0.0593443438410759
+          },
+          {
+            "player": "Paul George",
+            "attention_weight": 0.0402679443359375
+          },
+          {
+            "player": "Norman Powell",
+            "attention_weight": 0.03142418712377548
+          },
+          {
+            "player": "Terance Mann",
+            "attention_weight": 0.029042324051260948
+          },
+          {
+            "player": "Ivica Zubac",
+            "attention_weight": 0.028401682153344154
+          },
+          {
+            "player": "Russell Westbrook",
+            "attention_weight": 0.02385149896144867
+          },
+          {
+            "player": "Amir Coffey",
+            "attention_weight": 0.021239660680294037
+          },
+          {
+            "player": "Daniel Theis",
+            "attention_weight": 0.01545748021453619
+          },
+          {
+            "player": "Mason Plumlee",
+            "attention_weight": 0.00944532547146082
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612743,
+      "team_name": "Denver Nuggets",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 3,
+        "ensemble_score": 0.9310344827586207,
+        "ensemble_score_100": 93.1,
+        "conference_rank": 2,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 3,
+        "EOS_global_rank": 5,
+        "EOS_playoff_standings": 2,
+        "classification": "Over-ranked by 2 slots",
+        "post_playoff_rank": 5,
+        "rank_delta_playoffs": 2
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 3,
+        "xgboost_rank": 3,
+        "random_forest_rank": 17,
+        "model_b_rank": 3,
+        "model_c_rank": 17
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Nikola Joki\u0107",
+            "attention_weight": 0.7417181730270386
+          },
+          {
+            "player": "Michael Porter Jr.",
+            "attention_weight": 0.03942401707172394
+          },
+          {
+            "player": "Kentavious Caldwell-Pope",
+            "attention_weight": 0.03688577935099602
+          },
+          {
+            "player": "Aaron Gordon",
+            "attention_weight": 0.03600715845823288
+          },
+          {
+            "player": "Jamal Murray",
+            "attention_weight": 0.02821347489953041
+          },
+          {
+            "player": "Reggie Jackson",
+            "attention_weight": 0.027790432795882225
+          },
+          {
+            "player": "Christian Braun",
+            "attention_weight": 0.02486169897019863
+          },
+          {
+            "player": "Peyton Watson",
+            "attention_weight": 0.022274650633335114
+          },
+          {
+            "player": "Justin Holiday",
+            "attention_weight": 0.012658639810979366
+          },
+          {
+            "player": "Julian Strawther",
+            "attention_weight": 0.008656036108732224
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612762,
+      "team_name": "Utah Jazz",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 28,
+        "ensemble_score": 0.06896551724137931,
+        "ensemble_score_100": 6.9,
+        "conference_rank": 15,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 4,
+        "EOS_global_rank": 21,
+        "EOS_playoff_standings": 23,
+        "classification": "Under-ranked by 7 slots",
+        "post_playoff_rank": 23,
+        "rank_delta_playoffs": -5
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 28,
+        "xgboost_rank": 14,
+        "random_forest_rank": 4,
+        "model_b_rank": 14,
+        "model_c_rank": 4
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Lauri Markkanen",
+            "attention_weight": 0.7319504618644714
+          },
+          {
+            "player": "Collin Sexton",
+            "attention_weight": 0.04376400262117386
+          },
+          {
+            "player": "John Collins",
+            "attention_weight": 0.03716485947370529
+          },
+          {
+            "player": "Keyonte George",
+            "attention_weight": 0.03679322823882103
+          },
+          {
+            "player": "Jordan Clarkson",
+            "attention_weight": 0.03296162188053131
+          },
+          {
+            "player": "Walker Kessler",
+            "attention_weight": 0.029121270403265953
+          },
+          {
+            "player": "Kris Dunn",
+            "attention_weight": 0.024483002722263336
+          },
+          {
+            "player": "Talen Horton-Tucker",
+            "attention_weight": 0.017926804721355438
+          },
+          {
+            "player": "Taylor Hendricks",
+            "attention_weight": 0.014188791625201702
+          },
+          {
+            "player": "Brice Sensabaugh",
+            "attention_weight": 0.009041685611009598
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612760,
+      "team_name": "Oklahoma City Thunder",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 6,
+        "ensemble_score": 0.8275862068965517,
+        "ensemble_score_100": 82.8,
+        "conference_rank": 3,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 5,
+        "EOS_global_rank": 7,
+        "EOS_playoff_standings": 3,
+        "classification": "Over-ranked by 1 slots",
+        "post_playoff_rank": 7,
+        "rank_delta_playoffs": 1
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 6,
+        "xgboost_rank": 26,
+        "random_forest_rank": 29,
+        "model_b_rank": 26,
+        "model_c_rank": 29
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Shai Gilgeous-Alexander",
+            "attention_weight": 0.7410280704498291
+          },
+          {
+            "player": "Chet Holmgren",
+            "attention_weight": 0.038511019200086594
+          },
+          {
+            "player": "Luguentz Dort",
+            "attention_weight": 0.035960398614406586
+          },
+          {
+            "player": "Jalen Williams",
+            "attention_weight": 0.035675130784511566
+          },
+          {
+            "player": "Josh Giddey",
+            "attention_weight": 0.03193310275673866
+          },
+          {
+            "player": "Cason Wallace",
+            "attention_weight": 0.026731178164482117
+          },
+          {
+            "player": "Isaiah Joe",
+            "attention_weight": 0.022938808426260948
+          },
+          {
+            "player": "Aaron Wiggins",
+            "attention_weight": 0.018643025308847427
+          },
+          {
+            "player": "Kenrich Williams",
+            "attention_weight": 0.01589103974401951
+          },
+          {
+            "player": "Jaylin Williams",
+            "attention_weight": 0.013843831606209278
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612759,
+      "team_name": "San Antonio Spurs",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 21,
+        "ensemble_score": 0.3103448275862069,
+        "ensemble_score_100": 31.0,
+        "conference_rank": 11,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 6,
+        "EOS_global_rank": 24,
+        "EOS_playoff_standings": 26,
+        "classification": "Over-ranked by 3 slots",
+        "post_playoff_rank": 26,
+        "rank_delta_playoffs": 5
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 21,
+        "xgboost_rank": 10,
+        "random_forest_rank": 8,
+        "model_b_rank": 10,
+        "model_c_rank": 8
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Victor Wembanyama",
+            "attention_weight": 0.7248895168304443
+          },
+          {
+            "player": "Devin Vassell",
+            "attention_weight": 0.04628463089466095
+          },
+          {
+            "player": "Jeremy Sochan",
+            "attention_weight": 0.036821771413087845
+          },
+          {
+            "player": "Keldon Johnson",
+            "attention_weight": 0.03384848311543465
+          },
+          {
+            "player": "Tre Jones",
+            "attention_weight": 0.032974973320961
+          },
+          {
+            "player": "Malaki Branham",
+            "attention_weight": 0.025180581957101822
+          },
+          {
+            "player": "Zach Collins",
+            "attention_weight": 0.024071896448731422
+          },
+          {
+            "player": "Julian Champagnie",
+            "attention_weight": 0.022106502205133438
+          },
+          {
+            "player": "Cedi Osman",
+            "attention_weight": 0.021333782002329826
+          },
+          {
+            "player": "Blake Wesley",
+            "attention_weight": 0.012833865359425545
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612745,
+      "team_name": "Houston Rockets",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 25,
+        "ensemble_score": 0.1724137931034483,
+        "ensemble_score_100": 17.2,
+        "conference_rank": 14,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 7,
+        "EOS_global_rank": 17,
+        "EOS_playoff_standings": 19,
+        "classification": "Under-ranked by 8 slots",
+        "post_playoff_rank": 19,
+        "rank_delta_playoffs": -6
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 25,
+        "xgboost_rank": 12,
+        "random_forest_rank": 5,
+        "model_b_rank": 12,
+        "model_c_rank": 5
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Alperen Sengun",
+            "attention_weight": 0.4675287902355194
+          },
+          {
+            "player": "Jalen Green",
+            "attention_weight": 0.3051767349243164
+          },
+          {
+            "player": "Fred VanVleet",
+            "attention_weight": 0.04168205335736275
+          },
+          {
+            "player": "Jabari Smith Jr.",
+            "attention_weight": 0.03645497187972069
+          },
+          {
+            "player": "Dillon Brooks",
+            "attention_weight": 0.033927418291568756
+          },
+          {
+            "player": "Amen Thompson",
+            "attention_weight": 0.019961116835474968
+          },
+          {
+            "player": "Jeff Green",
+            "attention_weight": 0.019782891497015953
+          },
+          {
+            "player": "Aaron Holiday",
+            "attention_weight": 0.019458847120404243
+          },
+          {
+            "player": "Jae'Sean Tate",
+            "attention_weight": 0.01673687808215618
+          },
+          {
+            "player": "Cam Whitmore",
+            "attention_weight": 0.012443292886018753
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612742,
+      "team_name": "Dallas Mavericks",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 1,
+        "ensemble_score": 1.0,
+        "ensemble_score_100": 100.0,
+        "conference_rank": 1,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 8,
+        "EOS_global_rank": 2,
+        "EOS_playoff_standings": 6,
+        "classification": "Over-ranked by 1 slots",
+        "post_playoff_rank": 2,
+        "rank_delta_playoffs": 1
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Medium",
+        "deep_set_rank": 1,
+        "xgboost_rank": 7,
+        "random_forest_rank": 6,
+        "model_b_rank": 7,
+        "model_c_rank": 6
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Luka Don\u010di\u0107",
+            "attention_weight": 0.7458388805389404
+          },
+          {
+            "player": "Tim Hardaway Jr.",
+            "attention_weight": 0.03704764321446419
+          },
+          {
+            "player": "Kyrie Irving",
+            "attention_weight": 0.03490922600030899
+          },
+          {
+            "player": "Derrick Jones Jr.",
+            "attention_weight": 0.03088826686143875
+          },
+          {
+            "player": "Josh Green",
+            "attention_weight": 0.026264164596796036
+          },
+          {
+            "player": "Dereck Lively II",
+            "attention_weight": 0.02365054190158844
+          },
+          {
+            "player": "Dant\u00e9 Exum",
+            "attention_weight": 0.018368465825915337
+          },
+          {
+            "player": "Jaden Hardy",
+            "attention_weight": 0.01666869781911373
+          },
+          {
+            "player": "P.J. Washington",
+            "attention_weight": 0.0148409903049469
+          },
+          {
+            "player": "Maxi Kleber",
+            "attention_weight": 0.01443889457732439
+          }
+        ],
+        "contributors_are_fallback": false,
+        "ig_contributors": [
+          {
+            "player": "Luka Don\u010di\u0107",
+            "attribution_norm": 102.81303405761719
+          },
+          {
+            "player": "Kyrie Irving",
+            "attribution_norm": 2.8507742881774902
+          },
+          {
+            "player": "P.J. Washington",
+            "attribution_norm": 0.7404447197914124
+          },
+          {
+            "player": "Tim Hardaway Jr.",
+            "attribution_norm": 0.653118371963501
+          },
+          {
+            "player": "Dant\u00e9 Exum",
+            "attribution_norm": 0.5934467315673828
+          }
+        ]
+      }
+    },
+    {
+      "team_id": 1610612763,
+      "team_name": "Memphis Grizzlies",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 17,
+        "ensemble_score": 0.4482758620689655,
+        "ensemble_score_100": 44.8,
+        "conference_rank": 8,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 9,
+        "EOS_global_rank": 22,
+        "EOS_playoff_standings": 24,
+        "classification": "Over-ranked by 5 slots",
+        "post_playoff_rank": 24,
+        "rank_delta_playoffs": 7
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 17,
+        "xgboost_rank": 27,
+        "random_forest_rank": 26,
+        "model_b_rank": 27,
+        "model_c_rank": 26
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Jaren Jackson Jr.",
+            "attention_weight": 0.740532636642456
+          },
+          {
+            "player": "Desmond Bane",
+            "attention_weight": 0.035274989902973175
+          },
+          {
+            "player": "Santi Aldama",
+            "attention_weight": 0.03445027396082878
+          },
+          {
+            "player": "Vince Williams Jr.",
+            "attention_weight": 0.030667327344417572
+          },
+          {
+            "player": "John Konchar",
+            "attention_weight": 0.02497166395187378
+          },
+          {
+            "player": "GG Jackson",
+            "attention_weight": 0.022421367466449738
+          },
+          {
+            "player": "Ziaire Williams",
+            "attention_weight": 0.02208132855594158
+          },
+          {
+            "player": "Luke Kennard",
+            "attention_weight": 0.021252481266856194
+          },
+          {
+            "player": "Jake LaRavia",
+            "attention_weight": 0.01457920204848051
+          },
+          {
+            "player": "Marcus Smart",
+            "attention_weight": 0.012815245427191257
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612757,
+      "team_name": "Portland Trail Blazers",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 23,
+        "ensemble_score": 0.2413793103448276,
+        "ensemble_score_100": 24.1,
+        "conference_rank": 13,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 10,
+        "EOS_global_rank": 25,
+        "EOS_playoff_standings": 27,
+        "classification": "Over-ranked by 2 slots",
+        "post_playoff_rank": 27,
+        "rank_delta_playoffs": 4
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 23,
+        "xgboost_rank": 18,
+        "random_forest_rank": 16,
+        "model_b_rank": 18,
+        "model_c_rank": 16
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Anfernee Simons",
+            "attention_weight": 0.7267739176750183
+          },
+          {
+            "player": "Jerami Grant",
+            "attention_weight": 0.031037839129567146
+          },
+          {
+            "player": "Toumani Camara",
+            "attention_weight": 0.029490146785974503
+          },
+          {
+            "player": "Deandre Ayton",
+            "attention_weight": 0.028067028149962425
+          },
+          {
+            "player": "Scoot Henderson",
+            "attention_weight": 0.027338942512869835
+          },
+          {
+            "player": "Jabari Walker",
+            "attention_weight": 0.026864660903811455
+          },
+          {
+            "player": "Matisse Thybulle",
+            "attention_weight": 0.025204675272107124
+          },
+          {
+            "player": "Kris Murray",
+            "attention_weight": 0.019513297826051712
+          },
+          {
+            "player": "Duop Reath",
+            "attention_weight": 0.019174525514245033
+          },
+          {
+            "player": "Malcolm Brogdon",
+            "attention_weight": 0.01900513656437397
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612740,
+      "team_name": "New Orleans Pelicans",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 20,
+        "ensemble_score": 0.3448275862068966,
+        "ensemble_score_100": 34.5,
+        "conference_rank": 10,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 11,
+        "EOS_global_rank": 30,
+        "EOS_playoff_standings": 8,
+        "classification": "Over-ranked by 10 slots",
+        "post_playoff_rank": 15,
+        "rank_delta_playoffs": -5
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Medium",
+        "deep_set_rank": 19,
+        "xgboost_rank": 17,
+        "random_forest_rank": 22,
+        "model_b_rank": 17,
+        "model_c_rank": 22
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Zion Williamson",
+            "attention_weight": 0.732681930065155
+          },
+          {
+            "player": "Herbert Jones",
+            "attention_weight": 0.03518053889274597
+          },
+          {
+            "player": "Brandon Ingram",
+            "attention_weight": 0.03468254953622818
+          },
+          {
+            "player": "CJ McCollum",
+            "attention_weight": 0.032253753393888474
+          },
+          {
+            "player": "Jonas Valan\u010di\u016bnas",
+            "attention_weight": 0.030222536996006966
+          },
+          {
+            "player": "Trey Murphy III",
+            "attention_weight": 0.024479109793901443
+          },
+          {
+            "player": "Naji Marshall",
+            "attention_weight": 0.020519254729151726
+          },
+          {
+            "player": "Dyson Daniels",
+            "attention_weight": 0.020224720239639282
+          },
+          {
+            "player": "Jordan Hawkins",
+            "attention_weight": 0.0189320370554924
+          },
+          {
+            "player": "Larry Nance Jr.",
+            "attention_weight": 0.018539326265454292
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612756,
+      "team_name": "Phoenix Suns",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 12,
+        "ensemble_score": 0.6206896551724138,
+        "ensemble_score_100": 62.1,
+        "conference_rank": 7,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 12,
+        "EOS_global_rank": 29,
+        "EOS_playoff_standings": 10,
+        "classification": "Over-ranked by 17 slots",
+        "post_playoff_rank": 16,
+        "rank_delta_playoffs": 4
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 12,
+        "xgboost_rank": 9,
+        "random_forest_rank": 24,
+        "model_b_rank": 9,
+        "model_c_rank": 24
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Kevin Durant",
+            "attention_weight": 0.5683038234710693
+          },
+          {
+            "player": "Devin Booker",
+            "attention_weight": 0.21951036155223846
+          },
+          {
+            "player": "Grayson Allen",
+            "attention_weight": 0.04261116683483124
+          },
+          {
+            "player": "Jusuf Nurki\u0107",
+            "attention_weight": 0.03561503440141678
+          },
+          {
+            "player": "Eric Gordon",
+            "attention_weight": 0.032696954905986786
+          },
+          {
+            "player": "Bradley Beal",
+            "attention_weight": 0.02872764691710472
+          },
+          {
+            "player": "Drew Eubanks",
+            "attention_weight": 0.020100289955735207
+          },
+          {
+            "player": "Josh Okogie",
+            "attention_weight": 0.017345337197184563
+          },
+          {
+            "player": "Royce O'Neale",
+            "attention_weight": 0.011382310651242733
+          },
+          {
+            "player": "Nassir Little",
+            "attention_weight": 0.00821048952639103
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612747,
+      "team_name": "Los Angeles Lakers",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 10,
+        "ensemble_score": 0.6896551724137931,
+        "ensemble_score_100": 69.0,
+        "conference_rank": 5,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 13,
+        "EOS_global_rank": 13,
+        "EOS_playoff_standings": 12,
+        "classification": "Over-ranked by 3 slots",
+        "post_playoff_rank": 13,
+        "rank_delta_playoffs": 3
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 10,
+        "xgboost_rank": 28,
+        "random_forest_rank": 30,
+        "model_b_rank": 28,
+        "model_c_rank": 30
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "LeBron James",
+            "attention_weight": 0.7241813540458679
+          },
+          {
+            "player": "Anthony Davis",
+            "attention_weight": 0.05614132434129715
+          },
+          {
+            "player": "Austin Reaves",
+            "attention_weight": 0.04016171395778656
+          },
+          {
+            "player": "D'Angelo Russell",
+            "attention_weight": 0.03752514719963074
+          },
+          {
+            "player": "Taurean Prince",
+            "attention_weight": 0.0325428731739521
+          },
+          {
+            "player": "Rui Hachimura",
+            "attention_weight": 0.027154332026839256
+          },
+          {
+            "player": "Cam Reddish",
+            "attention_weight": 0.0156283937394619
+          },
+          {
+            "player": "Max Christie",
+            "attention_weight": 0.015172564424574375
+          },
+          {
+            "player": "Christian Wood",
+            "attention_weight": 0.014163230545818806
+          },
+          {
+            "player": "Jaxson Hayes",
+            "attention_weight": 0.0128771448507905
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612750,
+      "team_name": "Minnesota Timberwolves",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 9,
+        "ensemble_score": 0.7241379310344828,
+        "ensemble_score_100": 72.4,
+        "conference_rank": 4,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 14,
+        "EOS_global_rank": 3,
+        "EOS_playoff_standings": 4,
+        "classification": "Under-ranked by 6 slots",
+        "post_playoff_rank": 3,
+        "rank_delta_playoffs": -6
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 9,
+        "xgboost_rank": 19,
+        "random_forest_rank": 25,
+        "model_b_rank": 19,
+        "model_c_rank": 25
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "Anthony Edwards",
+            "attention_weight": 0.744255781173706
+          },
+          {
+            "player": "Rudy Gobert",
+            "attention_weight": 0.04085966572165489
+          },
+          {
+            "player": "Mike Conley",
+            "attention_weight": 0.03479442372918129
+          },
+          {
+            "player": "Karl-Anthony Towns",
+            "attention_weight": 0.03343705087900162
+          },
+          {
+            "player": "Jaden McDaniels",
+            "attention_weight": 0.03323139250278473
+          },
+          {
+            "player": "Naz Reid",
+            "attention_weight": 0.03131158649921417
+          },
+          {
+            "player": "Nickeil Alexander-Walker",
+            "attention_weight": 0.030733944848179817
+          },
+          {
+            "player": "Kyle Anderson",
+            "attention_weight": 0.028644239529967308
+          },
+          {
+            "player": "Jordan McLaughlin",
+            "attention_weight": 0.009429153054952621
+          },
+          {
+            "player": "Monte Morris",
+            "attention_weight": 0.00601427024230361
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    },
+    {
+      "team_id": 1610612758,
+      "team_name": "Sacramento Kings",
+      "conference": "W",
+      "prediction": {
+        "predicted_strength": 11,
+        "ensemble_score": 0.6551724137931034,
+        "ensemble_score_100": 65.5,
+        "conference_rank": 6,
+        "championship_odds": "3.3%"
+      },
+      "analysis": {
+        "actual_conference_rank": 15,
+        "EOS_global_rank": 16,
+        "EOS_playoff_standings": 18,
+        "classification": "Over-ranked by 5 slots",
+        "post_playoff_rank": 18,
+        "rank_delta_playoffs": 7
+      },
+      "ensemble_diagnostics": {
+        "model_agreement": "Low",
+        "deep_set_rank": 11,
+        "xgboost_rank": 21,
+        "random_forest_rank": 21,
+        "model_b_rank": 21,
+        "model_c_rank": 21
+      },
+      "roster_dependence": {
+        "primary_contributors": [
+          {
+            "player": "De'Aaron Fox",
+            "attention_weight": 0.7346609234809875
+          },
+          {
+            "player": "Domantas Sabonis",
+            "attention_weight": 0.05009279400110245
+          },
+          {
+            "player": "Keegan Murray",
+            "attention_weight": 0.03903111070394516
+          },
+          {
+            "player": "Harrison Barnes",
+            "attention_weight": 0.03624432906508446
+          },
+          {
+            "player": "Malik Monk",
+            "attention_weight": 0.0303629282861948
+          },
+          {
+            "player": "Kevin Huerter",
+            "attention_weight": 0.02535644732415676
+          },
+          {
+            "player": "Trey Lyles",
+            "attention_weight": 0.017141930758953094
+          },
+          {
+            "player": "Davion Mitchell",
+            "attention_weight": 0.015878159552812576
+          },
+          {
+            "player": "Keon Ellis",
+            "attention_weight": 0.013609851710498333
+          },
+          {
+            "player": "Chris Duarte",
+            "attention_weight": 0.011422553099691868
+          }
+        ],
+        "contributors_are_fallback": false
+      }
+    }
+  ],
+  "eos_rank_source": "eos_final_rank"
+}

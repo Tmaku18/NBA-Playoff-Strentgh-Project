@@ -79,12 +79,14 @@ python -m scripts.sweep_hparams --method optuna --n-trials 15 --n-jobs 4 --objec
 | n_estimators_xgb | best ± 30 | e.g. 210–270 if best=240 |
 | n_estimators_rf | best ± 25 | e.g. 170–220 if best=195 |
 
-**Sweep:** `--phase phase2_fine` with center params from Phase 2.1 best (config-driven or script arg).
+**Sweep:** `--phase phase2_fine` with `--phase2-best-config` pointing to Phase 2 coarse results. Ranges auto-center on best params.
 
 ```bash
-# After Phase 2.1, extract best params from sweep_results_summary.json and run:
-python -m scripts.sweep_hparams --method optuna --n-trials 10 --n-jobs 4 --objective spearman --listmle-target final_rank --phase phase2_fine --batch-id phase2_fine_spearman_final_rank --config config/outputs4_phase1.yaml
+# Robust: center on Phase 2 coarse best (outputs4/sweeps/phase2_coarse_spearman_final_rank)
+python -m scripts.sweep_hparams --method optuna --n-trials 15 --n-jobs 4 --objective spearman --listmle-target final_rank --phase phase2_fine --phase2-best-config outputs4/sweeps/phase2_coarse_spearman_final_rank --batch-id phase2_fine_spearman_final_rank --config config/outputs4_phase1.yaml
 ```
+
+Without `--phase2-best-config`, phase2_fine uses hardcoded defaults centered on Phase 2 coarse combo 8 (epochs 18-22, lr 0.075-0.085, n_xgb 190-220, n_rf 195-225).
 
 **Alternative:** Small grid (e.g. 2×2×2×2 = 16 combos) if phase2_fine uses discrete lists.
 

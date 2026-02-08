@@ -1,0 +1,14 @@
+{
+  "param_importances": {
+    "learning_rate": 0.3974634276387493,
+    "n_estimators_xgb": 0.23668866452864645,
+    "n_estimators_rf": 0.23521978578782485,
+    "model_a_epochs": 0.13062812204477944,
+    "subsample": 0.0,
+    "rolling_windows": 0.0,
+    "min_samples_leaf": 0.0,
+    "max_depth": 0.0,
+    "colsample_bytree": 0.0
+  },
+  "note": "Higher = more important. Fix low-importance params to best/default and re-run smaller grid or Optuna on the rest."
+}

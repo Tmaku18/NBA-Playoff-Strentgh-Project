@@ -1,0 +1,198 @@
+seasons:
+  2014-15:
+    start: '2014-10-01'
+    end: '2015-04-15'
+  2015-16:
+    start: '2015-10-01'
+    end: '2016-04-15'
+  2016-17:
+    start: '2016-10-01'
+    end: '2017-04-15'
+  2017-18:
+    start: '2017-10-01'
+    end: '2018-04-15'
+  2018-19:
+    start: '2018-10-01'
+    end: '2019-04-15'
+  2019-20:
+    start: '2019-10-01'
+    end: '2020-04-15'
+  2020-21:
+    start: '2020-12-01'
+    end: '2021-05-15'
+  2021-22:
+    start: '2021-10-01'
+    end: '2022-04-15'
+  2022-23:
+    start: '2022-10-01'
+    end: '2023-04-15'
+  2023-24:
+    start: '2023-10-01'
+    end: '2024-04-15'
+  2024-25:
+    start: '2024-10-01'
+    end: '2025-04-15'
+  2025-26:
+    start: '2025-10-01'
+    end: '2026-04-15'
+paths:
+  db: C:/Users/tmaku/OneDrive/Documents/GSU/Advanced Machine Learning/NBA Playoff
+    Strentgh Project/data/processed/nba_build.duckdb
+  raw: data/raw
+  processed: data/processed
+  outputs: /mnt/c/Users/tmaku/OneDrive/Documents/GSU/Advanced Machine Learning/NBA
+    Playoff Strentgh Project/outputs4/sweeps/phase3_coarse_ndcg4_final_rank/combo_0017/outputs
+  batch_cache: null
+build_db:
+  skip_if_exists: true
+repro:
+  seed: 42
+model_a:
+  stat_dim: 21
+  num_embeddings: 500
+  embedding_dim: 32
+  encoder_hidden:
+  - 128
+  - 64
+  attention_heads: 4
+  dropout: 0.2
+  learning_rate: 0.0001
+  grad_clip_max_norm: 5.0
+  epochs: 23
+  early_stopping_patience: 0
+  early_stopping_min_delta: 0.0
+  early_stopping_val_frac: 0.25
+  minutes_bias_weight: 0.3
+  minutes_sum_min: 1.0e-06
+  attention_debug: false
+  attention_fallback_strategy: minutes
+  use_amp: true
+model_b:
+  xgb:
+    n_estimators: 256
+    max_depth: 5
+    learning_rate: 0.07407128826201152
+    early_stopping_rounds: 20
+    subsample: 0.8
+    colsample_bytree: 0.7
+  rf:
+    n_estimators: 182
+    max_depth: 12
+    min_samples_leaf: 5
+training:
+  n_folds: 5
+  rolling_windows:
+  - 15
+  - 30
+  roster_size: 15
+  target_rank: playoffs
+  listmle_target: final_rank
+  train_seasons:
+  - 2015-16
+  - 2016-17
+  - 2017-18
+  - 2018-19
+  - 2019-20
+  - 2020-21
+  - 2021-22
+  - 2022-23
+  test_seasons:
+  - 2023-24
+  - 2024-25
+  validation_seasons:
+  - 2023-24
+  holdout_seasons:
+  - 2024-25
+  train_test_cutoff: null
+  train_frac: 0.75
+  max_lists_oof: 100
+  max_final_batches: 100
+  walk_forward: false
+  use_prior_season_baseline: true
+  prior_season_lookback_days: 365
+output:
+  true_strength_scale: percentile
+  odds_temperature: 0.5
+  championship_odds_method: softmax
+  ig_inference_top_k: 1
+  ig_inference_steps: 50
+elo:
+  cold_start_games: 10
+  regression_to_mean: 0.25
+  enabled: true
+massey:
+  enabled: true
+sos_srs:
+  data_path: data/raw/Team_Records.csv
+  enabled: false
+team_rolling:
+  enabled: false
+injury:
+  data_path: data/raw/injury_reports
+  minutes_heuristic: proportional
+  enabled: false
+motivation:
+  late_season_games: 15
+  playoff_wins_threshold: 42
+  enabled: true
+raptor:
+  data_path: docs/modern_RAPTOR_by_team.csv
+  enabled: true
+monte_carlo:
+  hca: 100.0
+  rating_scale: 400.0
+  n_seasons: 10000
+  n_series: 1000
+logging:
+  roster_debug: false
+  playoff_debug: false
+sweep:
+  model_a_epochs:
+  - 8
+  - 10
+  - 12
+  - 14
+  - 16
+  - 18
+  - 20
+  - 22
+  - 24
+  - 26
+  - 28
+  rolling_windows:
+  - - 10
+    - 30
+  model_b:
+    max_depth:
+    - 3
+    - 4
+    - 5
+    - 6
+    learning_rate:
+    - 0.05
+    - 0.08
+    - 0.1
+    - 0.12
+    n_estimators_xgb:
+    - 200
+    - 250
+    - 300
+    - 350
+    n_estimators_rf:
+    - 150
+    - 200
+    - 250
+    subsample:
+    - 0.8
+    colsample_bytree:
+    - 0.7
+    min_samples_leaf:
+    - 4
+    - 5
+    - 6
+  include_clone_classifier: false
+inference:
+  run_id: run_025
+  run_id_base: 25
+  also_train_predictions: false
+  require_eos_final_rank: false

@@ -398,7 +398,7 @@ def train_model_a_on_batches(
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
     attention_debug = bool(ma.get("attention_debug", False))
     use_amp = bool(ma.get("use_amp", False)) and device.type == "cuda" and torch.cuda.is_available()
-    scaler = torch.cuda.amp.GradScaler() if use_amp else None
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
     epochs = int(max_epochs) if max_epochs is not None else int(ma.get("epochs", 20))
     patience = int(ma.get("early_stopping_patience", 3))
     min_delta = float(ma.get("early_stopping_min_delta", 0.0))
@@ -477,7 +477,7 @@ def train_model_a(
     grad_clip_max_norm = float(ma.get("grad_clip_max_norm", 1.0))
     attention_debug = bool(ma.get("attention_debug", False))
     use_amp = bool(ma.get("use_amp", False)) and device.type == "cuda" and torch.cuda.is_available()
-    scaler = torch.cuda.amp.GradScaler() if use_amp else None
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
 
     if batches is None:
         batches = [get_dummy_batch(4, 10, 15, stat_dim, num_emb, device) for _ in range(5)]
